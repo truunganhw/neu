@@ -1,0 +1,2857 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Ghost Alexander's Midnight Quest: The Adventure Map</title>
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- FontAwesome & Google Fonts -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link href="https://fonts.googleapis.com/css2?family=Fredoka:wght@400;600;700;800&family=Nunito:wght@700;900&display=swap" rel="stylesheet">
+    <!-- Confetti & Three.js Libraries -->
+    <script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.6.0/dist/confetti.browser.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+
+    <style>
+        * {
+            box-sizing: border-box;
+            user-select: none;
+            -webkit-user-select: none;
+        }
+
+        body, html {
+            margin: 0;
+            padding: 0;
+            width: 100vw;
+            height: 100vh;
+            overflow: hidden;
+            font-family: 'Fredoka', cursive, sans-serif;
+            background: #050b1e;
+            color: #ffffff;
+        }
+
+        #canvas3d {
+            width: 100vw;
+            height: 100vh;
+            display: block;
+            touch-action: none;
+        }
+
+        /* Glassmorphism Fantasy HUD */
+        .fantasy-panel {
+            background: linear-gradient(180deg, rgba(17, 24, 58, 0.88) 0%, rgba(9, 13, 33, 0.94) 100%);
+            border: 2px solid rgba(56, 189, 248, 0.45);
+            box-shadow: 0 20px 45px rgba(0, 0, 0, 0.85), inset 0 2px 5px rgba(255, 255, 255, 0.2);
+            backdrop-filter: blur(14px);
+        }
+
+        .hud-pill {
+            background: linear-gradient(180deg, #15224e 0%, #0d1636 100%);
+            border: 1.5px solid rgba(56, 189, 248, 0.6);
+            box-shadow: inset 0 2px 4px rgba(0, 0, 0, 0.6), 0 4px 10px rgba(0, 0, 0, 0.4);
+        }
+
+        .gold-btn {
+            background: linear-gradient(180deg, #fde047 0%, #f59e0b 60%, #d97706 100%);
+            box-shadow: 0 4px 0 #92400e, 0 8px 18px rgba(245, 158, 11, 0.45);
+            transition: all 0.12s cubic-bezier(0.34, 1.56, 0.64, 1);
+        }
+        .gold-btn:active {
+            transform: translateY(3px);
+            box-shadow: 0 1px 0 #92400e, 0 3px 8px rgba(245, 158, 11, 0.3);
+        }
+
+        <!-- Floating Quest Indicator -->
+        @keyframes floatUpDown {
+            0%, 100% { transform: translateY(0); }
+            50% { transform: translateY(-10px); }
+        }
+        .float-bob {
+            animation: floatUpDown 2s infinite ease-in-out;
+        }
+
+        /* Comic BOO Floating Billboard */
+        @keyframes booBounce {
+            0% { transform: scale(0.6) translateY(10px); opacity: 0; }
+            50% { transform: scale(1.25) translateY(-15px); opacity: 1; }
+            100% { transform: scale(1.0) translateY(-25px); opacity: 0; }
+        }
+        .boo-bubble {
+            animation: booBounce 1.2s forwards ease-out;
+        }
+
+        /* Live Dialogue Slide-up */
+        @keyframes slideUpDialogue {
+            from { transform: translateY(120%); opacity: 0; }
+            to { transform: translateY(0); opacity: 1; }
+        }
+        .dialogue-slide-in {
+            animation: slideUpDialogue 0.35s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+        }
+    </style>
+</head>
+<body class="relative overflow-hidden">
+
+    <!-- Full-screen 3D Canvas -->
+    <canvas id="canvas3d"></canvas>
+
+    <!-- ========================================================================= -->
+    <!-- TOP STATUS HUD                                                            -->
+    <!-- ========================================================================= -->
+    <div class="pointer-events-none fixed top-0 left-0 right-0 z-20 p-3 sm:p-5 flex items-center justify-between">
+        
+        <!-- Left: Branding & Speed Indicator -->
+        <div class="pointer-events-auto flex items-center gap-3">
+            <div class="hud-pill px-3.5 py-1.5 rounded-2xl flex items-center gap-2">
+                <span class="text-xl">🗺️</span>
+                <div>
+                    <span class="text-[10px] font-black uppercase tracking-wider text-sky-400 block leading-tight">Adventure Map</span>
+                    <span id="speedStatLabel" class="text-xs font-black text-amber-300">Speed: Normal (1.0x)</span>
+                </div>
+            </div>
+
+            <!-- Controls reminder (Desktop) -->
+            <div class="hidden lg:flex items-center gap-2 hud-pill px-3 py-1.5 rounded-2xl text-[11px] text-sky-200">
+                <i class="fa-solid fa-person-walking text-sky-400"></i>
+                <span>Click / Tap ground or use <strong>WASD / Arrow Keys</strong> to walk! Click objects to shake!</span>
+            </div>
+        </div>
+
+        <!-- Right: Backpack, Shop, Sound & Fullscreen -->
+        <div class="pointer-events-auto flex items-center gap-2 sm:gap-3">
+            <!-- Current Chapter / Stage Pill -->
+            <div id="stageBadge" class="hud-pill px-3 py-1.5 rounded-2xl flex items-center gap-1.5 border border-purple-400">
+                <span class="text-base sm:text-lg">🚪</span>
+                <span id="stageLabel" class="text-xs sm:text-sm font-black text-fuchsia-300">Stage 1: Alexander's Hat</span>
+            </div>
+
+            <!-- Candy Counter -->
+            <div class="hud-pill px-3 py-1.5 rounded-2xl flex items-center gap-1.5">
+                <span class="text-base sm:text-lg">🍬</span>
+                <span id="topCandies" class="text-xs sm:text-sm font-black text-amber-300">0</span>
+            </div>
+            <!-- Magic Pumpkin Counter -->
+            <div class="hud-pill px-3 py-1.5 rounded-2xl flex items-center gap-1.5">
+                <span class="text-base sm:text-lg">🎃</span>
+                <span id="topPumpkins" class="text-xs sm:text-sm font-black text-orange-400">0</span>
+            </div>
+            <!-- Mystic Gem Counter -->
+            <div class="hud-pill px-3 py-1.5 rounded-2xl flex items-center gap-1.5">
+                <span class="text-base sm:text-lg">💎</span>
+                <span id="topGems" class="text-xs sm:text-sm font-black text-cyan-300">0</span>
+            </div>
+
+            <!-- Backpack (Inventory) Button -->
+            <button onclick="toggleBackpack()" class="relative hud-pill hover:bg-sky-900/60 p-2 sm:px-3 sm:py-1.5 rounded-2xl flex items-center gap-1.5 transition active:scale-95">
+                <span class="text-lg">🎒</span>
+                <span class="hidden sm:inline text-xs font-black text-white">Bag</span>
+                <span id="bagItemCount" class="absolute -top-1.5 -right-1.5 bg-sky-500 text-white text-[9px] font-black w-4 h-4 rounded-full flex items-center justify-center border border-white">0</span>
+            </button>
+
+            <!-- Costume Shop Button -->
+            <button onclick="toggleShop()" class="gold-btn px-3.5 py-1.5 rounded-2xl flex items-center gap-1.5 text-purple-950 font-black text-xs sm:text-sm active:scale-95 transition">
+                <span class="text-base">🛍️</span>
+                <span class="hidden sm:inline">Costume Shop</span>
+            </button>
+
+            <!-- Sound & Fullscreen Buttons -->
+            <button onclick="toggleSound()" id="soundBtn" class="hud-pill w-9 h-9 rounded-2xl flex items-center justify-center text-sky-300 hover:text-white transition">
+                <i class="fa-solid fa-volume-high text-xs"></i>
+            </button>
+            <button onclick="toggleFullscreen()" class="hud-pill w-9 h-9 rounded-2xl flex items-center justify-center text-sky-300 hover:text-white transition">
+                <i class="fa-solid fa-expand text-xs"></i>
+            </button>
+        </div>
+    </div>
+
+    <!-- ========================================================================= -->
+    <!-- PERSISTENT TARGET QUEST PIN (Always shows target hat while exploring!)    -->
+    <!-- ========================================================================= -->
+    <div id="targetQuestWidget" class="pointer-events-auto fixed top-20 sm:top-24 left-3 sm:left-5 z-20 transition-all duration-300 hidden">
+        <div class="fantasy-panel px-3 py-2 rounded-2xl border-2 border-amber-400 shadow-2xl flex items-center gap-3 bg-indigo-950/95 max-w-xs sm:max-w-sm">
+            <!-- Visual SVG of Target Hat / Quest Item (Dynamically Rendered) -->
+            <div id="targetItemGraphicContainer" class="w-12 h-12 bg-amber-400/20 rounded-xl border border-amber-300 flex items-center justify-center relative p-1 shrink-0">
+                <svg id="targetItemSvg" viewBox="0 0 100 100" class="w-10 h-10 drop-shadow">
+                    <!-- Default: Stage 1 Sundae Hat -->
+                    <polygon points="50,15 20,80 80,80" fill="#facc15" stroke="#ca8a04" stroke-width="3" />
+                    <line x1="38" y1="45" x2="62" y2="45" stroke="#eab308" stroke-width="2" />
+                    <line x1="30" y1="62" x2="70" y2="62" stroke="#eab308" stroke-width="2" />
+                    <line x1="40" y1="28" x2="65" y2="78" stroke="#eab308" stroke-width="1.5" />
+                    <line x1="60" y1="28" x2="35" y2="78" stroke="#eab308" stroke-width="1.5" />
+                    <path d="M 22 75 C 28 85, 34 72, 42 84 C 50 72, 58 86, 68 74 C 74 82, 78 75, 78 75 L 80 80 L 20 80 Z" fill="#3e1f0e" />
+                    <circle cx="50" cy="15" r="7" fill="#ef4444" stroke="#991b1b" stroke-width="1.5" />
+                    <path d="M 50 10 Q 56 4 60 5" stroke="#15803d" stroke-width="2" fill="none" />
+                </svg>
+                <span class="absolute -top-1 -right-1 bg-red-500 text-white text-[8px] font-black px-1 rounded-full">TARGET</span>
+            </div>
+            <div>
+                <span id="targetGoalLabel" class="text-[9px] font-black uppercase tracking-wider text-amber-300 block">Current Goal: Find This!</span>
+                <span id="targetItemName" class="text-xs font-black text-white block">Yellow Sundae Hat</span>
+                <span id="targetItemDesc" class="text-[10px] text-sky-200">Yellow cone + dripping chocolate + cherry</span>
+            </div>
+        </div>
+    </div>
+
+    <!-- ========================================================================= -->
+    <!-- WRONG ITEM WARNING BANNER ("This is not the right hat!")                   -->
+    <!-- ========================================================================= -->
+    <div id="wrongItemBanner" class="pointer-events-none fixed top-44 sm:top-48 left-1/2 -translate-x-1/2 z-40 hidden transition-all duration-300">
+        <div class="bg-rose-950/95 border-2 border-rose-500 text-white px-5 py-3 rounded-2xl shadow-2xl backdrop-blur-md flex items-center gap-3">
+            <span id="wrongItemIcon" class="text-3xl">🐸</span>
+            <div>
+                <div class="flex items-center gap-2">
+                    <span class="text-sm font-black text-rose-300">Oops! Not the right hat!</span>
+                    <span class="text-[10px] bg-rose-700 text-white font-extrabold px-1.5 py-0.5 rounded">Mismatch</span>
+                </div>
+                <p id="wrongItemDesc" class="text-xs text-rose-100 font-semibold">
+                    You found a Green Frog Hat! Alexander needs his <strong>Yellow Sundae Hat</strong>!
+                </p>
+            </div>
+        </div>
+    </div>
+
+    <!-- ========================================================================= -->
+    <!-- INTERACTIVE FLOATING CLICK PROMPTS OVER 3D WORLD                          -->
+    <!-- ========================================================================= -->
+    <div id="ghostIndicator" class="pointer-events-none fixed -translate-x-1/2 -translate-y-1/2 z-20 hidden">
+        <div class="float-bob bg-gradient-to-r from-amber-400 to-yellow-300 text-purple-950 px-3 py-1 rounded-full font-black text-xs border-2 border-white shadow-[0_0_20px_rgba(251,191,36,0.9)] flex items-center gap-1 cursor-pointer pointer-events-auto" onclick="clickGhostAlexander()">
+            <span>Click Me / Press [E]!</span>
+            <span class="text-sm">👻</span>
+        </div>
+    </div>
+
+    <!-- Floating Comic BOO Tag projected above Alexander when he scares kids -->
+    <div id="booFloatingTag" class="pointer-events-none fixed -translate-x-1/2 -translate-y-1/2 z-25 hidden">
+        <div class="boo-bubble bg-gradient-to-r from-fuchsia-600 to-rose-600 text-white font-black text-sm sm:text-base px-3.5 py-1.5 rounded-2xl border-2 border-yellow-300 shadow-[0_0_25px_rgba(236,72,153,0.9)] flex items-center gap-1.5">
+            <span>👻 BOOOO!! 😱</span>
+        </div>
+    </div>
+
+    <!-- Top Event Ticker (Moved from bottom to avoid overlap with dialogue) -->
+    <div id="tickerContainer" class="pointer-events-none fixed top-24 left-1/2 -translate-x-1/2 z-[60] flex justify-center w-full max-w-lg px-4 transition-opacity duration-300 opacity-0 hidden">
+        <div id="eventTicker" class="pointer-events-auto fantasy-panel px-4 py-2 rounded-2xl text-xs sm:text-sm font-bold text-sky-100 border border-sky-400/40 shadow-xl flex items-center gap-2 w-full justify-center">
+            <span class="text-lg" id="tickerIcon">✨</span>
+            <span id="tickerText">Explore the winding path! Click objects to shake!</span>
+        </div>
+    </div>
+
+    <!-- Mobile Controls (Kept at bottom right) -->
+    <div id="mobileControlsBar" class="pointer-events-none fixed bottom-4 right-4 z-20 flex justify-end">
+        <!-- Mobile Touch Jump / Hop Button -->
+        <button onclick="triggerJump()" class="pointer-events-auto sm:hidden w-14 h-14 rounded-2xl gold-btn text-purple-950 font-black text-xs flex flex-col items-center justify-center shadow-2xl">
+            <i class="fa-solid fa-arrow-up text-base"></i>
+            <span>HOP</span>
+        </button>
+    </div>
+
+    <!-- ========================================================================= -->
+    <!-- NON-BLOCKING IN-GAME LIVE DIALOGUE HUD (Screen stays 100% visible!)       -->
+    <!-- ========================================================================= -->
+    <div id="liveDialogueHUD" class="pointer-events-none fixed bottom-3 left-2 right-2 sm:left-6 sm:right-6 md:left-12 md:right-12 z-35 hidden">
+        <div class="pointer-events-auto fantasy-panel dialogue-slide-in rounded-3xl p-4 sm:p-5 border-2 border-amber-400 shadow-2xl backdrop-blur-md max-w-3xl mx-auto flex flex-col sm:flex-row items-center gap-3 sm:gap-5">
+            <!-- Ghost Portrait -->
+            <div class="relative shrink-0 flex items-center justify-center">
+                <div class="w-16 h-16 sm:w-20 sm:h-20 rounded-2xl bg-indigo-900/90 border-2 border-amber-300 flex items-center justify-center text-4xl sm:text-5xl shadow-[0_0_20px_rgba(251,191,36,0.5)]">
+                    <span id="dialogueGhostEmoji" class="animate-pulse">👻</span>
+                </div>
+                <div class="absolute -top-2 -right-2 bg-amber-400 text-purple-950 text-[10px] font-black px-2 py-0.5 rounded-full border border-white">
+                    Alexander
+                </div>
+            </div>
+
+            <!-- Dialogue Content & Target Hat Preview Card -->
+            <div class="flex-1 text-center sm:text-left min-w-0">
+                <div class="flex items-center justify-center sm:justify-start gap-2 mb-1">
+                    <h3 id="dialogueSpeakerTitle" class="text-sm sm:text-base font-black text-amber-300">Ghost Alexander (Misunderstood Spirit)</h3>
+                    <span class="text-[10px] px-2 py-0.5 rounded-full bg-indigo-950 text-sky-300 border border-sky-400/30">Quest Dialogue</span>
+                </div>
+                <p id="dialogueBodyText" class="text-xs sm:text-sm text-sky-100 font-semibold leading-relaxed">
+                    "Boo-hoo! My treasured <strong>Yellow Sundae Hat</strong> (yellow waffle cone with dripping chocolate & cherry) blew away! I mistakenly thought someone took it, so I got angry and scared the kids! Can you help me find it?"
+                </p>
+
+                <!-- Detailed Visual Description Card with Hat Artwork -->
+                <div class="mt-2 p-2 bg-indigo-950/80 rounded-xl border border-amber-400/40 flex items-center gap-3">
+                    <div class="w-10 h-10 bg-amber-400/20 rounded-lg border border-amber-300 flex items-center justify-center shrink-0">
+                        <svg viewBox="0 0 100 100" class="w-8 h-8">
+                            <polygon points="50,15 20,80 80,80" fill="#facc15" stroke="#ca8a04" stroke-width="3" />
+                            <line x1="38" y1="45" x2="62" y2="45" stroke="#eab308" stroke-width="2" />
+                            <line x1="30" y1="62" x2="70" y2="62" stroke="#eab308" stroke-width="2" />
+                            <path d="M 22 75 C 28 85, 34 72, 42 84 C 50 72, 58 86, 68 74 C 74 82, 78 75, 78 75 L 80 80 L 20 80 Z" fill="#3e1f0e" />
+                            <circle cx="50" cy="15" r="7" fill="#ef4444" stroke="#991b1b" stroke-width="1.5" />
+                            <path d="M 50 10 Q 56 4 60 5" stroke="#15803d" stroke-width="2" fill="none" />
+                        </svg>
+                    </div>
+                    <div class="text-[11px] text-amber-200/90 font-bold text-left">
+                        <span class="text-yellow-300 block">Look for: Yellow Waffle Cone + Dripping Chocolate + Cherry!</span>
+                        <span id="dialogueHintText" class="text-sky-200 text-[10px]">Be careful! Other items and hats may pop out, but only this one is mine!</span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Interactive Action Buttons -->
+            <div class="flex flex-row sm:flex-col gap-2 shrink-0 w-full sm:w-auto">
+                <button onclick="readAloudAlexanderStory()" class="flex-1 sm:flex-none blue-btn px-3 py-2 rounded-xl text-white font-black text-xs flex items-center justify-center gap-1.5">
+                    <i class="fa-solid fa-volume-high text-xs"></i>
+                    <span>Read Aloud</span>
+                </button>
+                <button onclick="closeLiveDialogue()" class="flex-1 sm:flex-none gold-btn px-4 py-2 rounded-xl text-purple-950 font-black text-xs flex items-center justify-center gap-1">
+                    <span>Understood! 👍</span>
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- ========================================================================= -->
+    <!-- BACKPACK (INVENTORY) MODAL                                                -->
+    <!-- ========================================================================= -->
+    <div id="backpackModal" class="fixed inset-0 z-50 bg-black/80 flex items-center justify-center p-4 backdrop-blur-md hidden">
+        <div class="fantasy-panel border-2 border-sky-400 rounded-3xl p-6 max-w-md w-full">
+            <div class="flex items-center justify-between border-b border-sky-500/30 pb-3 mb-4">
+                <div class="flex items-center gap-2">
+                    <span class="text-2xl">🎒</span>
+                    <h3 class="text-xl font-black text-white">Explorer's Backpack</h3>
+                </div>
+                <button onclick="toggleBackpack()" class="text-sky-300 hover:text-white text-xl">
+                    <i class="fa-solid fa-xmark"></i>
+                </button>
+            </div>
+
+            <div class="grid grid-cols-2 gap-3 mb-4">
+                <div class="bg-indigo-950/80 border border-sky-400/40 p-3 rounded-2xl flex items-center gap-3">
+                    <span class="text-3xl">🍬</span>
+                    <div>
+                        <span class="text-xs text-sky-300 font-bold block">Golden Candies</span>
+                        <span id="bagCandiesCount" class="text-lg font-black text-amber-300">0</span>
+                    </div>
+                </div>
+
+                <div class="bg-indigo-950/80 border border-sky-400/40 p-3 rounded-2xl flex items-center gap-3">
+                    <span class="text-3xl">🎃</span>
+                    <div>
+                        <span class="text-xs text-sky-300 font-bold block">Magic Pumpkins</span>
+                        <span id="bagPumpkinsCount" class="text-lg font-black text-orange-400">0</span>
+                    </div>
+                </div>
+
+                <div class="bg-indigo-950/80 border border-sky-400/40 p-3 rounded-2xl flex items-center gap-3">
+                    <span class="text-3xl">💎</span>
+                    <div>
+                        <span class="text-xs text-sky-300 font-bold block">Mystic Gems</span>
+                        <span id="bagGemsCount" class="text-lg font-black text-cyan-300">0</span>
+                    </div>
+                </div>
+
+                <div class="bg-indigo-950/80 border border-sky-400/40 p-3 rounded-2xl flex items-center gap-3">
+                    <span class="text-3xl">🍨</span>
+                    <div>
+                        <span class="text-xs text-sky-300 font-bold block">Alexander's Hat</span>
+                        <span id="bagSundaeStatus" class="text-xs font-black text-red-400">Not Found</span>
+                    </div>
+                </div>
+            </div>
+
+            <p class="text-xs text-sky-200/80 text-center mb-4">
+                Tip: Collect candies and items from bushes, trees, and caves to exchange for skins in the Costume Shop!
+            </p>
+
+            <button onclick="toggleBackpack(); toggleShop();" class="w-full gold-btn py-2.5 rounded-2xl text-purple-950 font-black text-sm">
+                Open Costume Shop 🛍️
+            </button>
+        </div>
+    </div>
+
+    <!-- ========================================================================= -->
+    <!-- COSTUME SHOP MODAL (Sonic speed, Skeleton, Wizard & Sundae)                -->
+    <!-- ========================================================================= -->
+    <div id="shopModal" class="fixed inset-0 z-50 bg-black/85 flex items-center justify-center p-4 backdrop-blur-md hidden">
+        <div class="fantasy-panel border-2 border-sky-400 rounded-3xl p-6 sm:p-7 max-w-xl w-full">
+            <div class="flex items-center justify-between border-b border-sky-500/30 pb-3 mb-4">
+                <div class="flex items-center gap-2">
+                    <span class="text-2xl">🛍️</span>
+                    <div>
+                        <h3 class="text-xl font-black text-white">Midnight Costume Shop</h3>
+                        <span class="text-xs text-sky-300">Exchange collected items for functional hero costumes!</span>
+                    </div>
+                </div>
+                <button onclick="toggleShop()" class="text-sky-300 hover:text-white text-xl">
+                    <i class="fa-solid fa-xmark"></i>
+                </button>
+            </div>
+
+            <!-- Shop Items Grid -->
+            <div class="grid grid-cols-1 sm:grid-cols-2 gap-3.5 mb-5 max-h-[55vh] overflow-y-auto pr-1">
+                
+                <!-- 1. SONIC RUNNER SKIN -->
+                <div class="bg-indigo-950/80 border border-sky-400/50 p-3.5 rounded-2xl flex flex-col justify-between">
+                    <div class="flex items-start gap-3 mb-2">
+                        <div class="w-12 h-12 rounded-xl bg-blue-600 flex items-center justify-center text-2xl shadow-inner shrink-0">
+                            🦔
+                        </div>
+                        <div>
+                            <h4 class="text-sm font-black text-cyan-300">Sonic Runner Skin</h4>
+                            <span class="text-[10px] text-amber-300 font-extrabold block">⚡ +80% Speed Boost & Blue Trail</span>
+                            <span class="text-[11px] text-sky-200">Iconic speedy blue quills!</span>
+                        </div>
+                    </div>
+                    <div class="flex items-center justify-between mt-2 pt-2 border-t border-sky-500/20">
+                        <span class="text-xs font-black text-amber-300">🍬 4 Candies + 💎 1 Gem</span>
+                        <button onclick="buyOrEquipSkin('sonic')" id="btnSkin-sonic" class="blue-btn px-3 py-1 rounded-xl text-xs font-black text-white">
+                            Exchange
+                        </button>
+                    </div>
+                </div>
+
+                <!-- 2. SKELETON SPOOK SKIN -->
+                <div class="bg-indigo-950/80 border border-sky-400/50 p-3.5 rounded-2xl flex flex-col justify-between">
+                    <div class="flex items-start gap-3 mb-2">
+                        <div class="w-12 h-12 rounded-xl bg-slate-800 flex items-center justify-center text-2xl shadow-inner shrink-0">
+                            💀
+                        </div>
+                        <div>
+                            <h4 class="text-sm font-black text-purple-200">Skeleton Spook</h4>
+                            <span class="text-[10px] text-emerald-400 font-extrabold block">🦴 Glowing Green Aura</span>
+                            <span class="text-[11px] text-sky-200">Bone-chilling Halloween classic!</span>
+                        </div>
+                    </div>
+                    <div class="flex items-center justify-between mt-2 pt-2 border-t border-sky-500/20">
+                        <span class="text-xs font-black text-orange-400">🎃 2 Pumpkins</span>
+                        <button onclick="buyOrEquipSkin('skeleton')" id="btnSkin-skeleton" class="blue-btn px-3 py-1 rounded-xl text-xs font-black text-white">
+                            Exchange
+                        </button>
+                    </div>
+                </div>
+
+                <!-- 3. WIZARD MASTER SKIN -->
+                <div class="bg-indigo-950/80 border border-sky-400/50 p-3.5 rounded-2xl flex flex-col justify-between">
+                    <div class="flex items-start gap-3 mb-2">
+                        <div class="w-12 h-12 rounded-xl bg-purple-900 flex items-center justify-center text-2xl shadow-inner shrink-0">
+                            🧙‍♂️
+                        </div>
+                        <div>
+                            <h4 class="text-sm font-black text-fuchsia-300">Twilight Wizard</h4>
+                            <span class="text-[10px] text-cyan-300 font-extrabold block">✨ Magic Starlight Lantern</span>
+                            <span class="text-[11px] text-sky-200">Star-studded mystical wizard hat!</span>
+                        </div>
+                    </div>
+                    <div class="flex items-center justify-between mt-2 pt-2 border-t border-sky-500/20">
+                        <span class="text-xs font-black text-amber-300">🍬 3 Candies</span>
+                        <button onclick="buyOrEquipSkin('wizard')" id="btnSkin-wizard" class="blue-btn px-3 py-1 rounded-xl text-xs font-black text-white">
+                            Exchange
+                        </button>
+                    </div>
+                </div>
+
+                <!-- 4. ALEXANDER'S SUNDAE HAT -->
+                <div class="bg-indigo-950/80 border border-sky-400/50 p-3.5 rounded-2xl flex flex-col justify-between">
+                    <div class="flex items-start gap-3 mb-2">
+                        <div class="w-12 h-12 rounded-xl bg-amber-400 text-purple-950 flex items-center justify-center text-2xl shadow-inner shrink-0">
+                            🍨
+                        </div>
+                        <div>
+                            <h4 class="text-sm font-black text-yellow-300">Alexander's Sundae Hat</h4>
+                            <span class="text-[10px] text-pink-300 font-extrabold block">💖 Ghost Friendship Badge</span>
+                            <span class="text-[11px] text-sky-200">Found via the forest quest!</span>
+                        </div>
+                    </div>
+                    <div class="flex items-center justify-between mt-2 pt-2 border-t border-sky-500/20">
+                        <span id="sundaeShopCost" class="text-xs font-black text-amber-300">Quest Reward</span>
+                        <button onclick="buyOrEquipSkin('sundae')" id="btnSkin-sundae" class="bg-slate-700 px-3 py-1 rounded-xl text-xs font-black text-slate-400 cursor-not-allowed">
+                            Locked
+                        </button>
+                    </div>
+                </div>
+
+            </div>
+
+            <button onclick="buyOrEquipSkin('default')" class="w-full bg-slate-800 hover:bg-slate-700 text-sky-200 py-2 rounded-xl text-xs font-bold transition">
+                Reset to Default Torch Explorer Skin
+            </button>
+        </div>
+    </div>
+
+    <!-- ========================================================================= -->
+    <!-- QUEST VICTORY CELEBRATION MODAL                                           -->
+    <!-- ========================================================================= -->
+    <div id="victoryModal" class="fixed inset-0 z-50 bg-black/85 flex items-center justify-center p-4 backdrop-blur-md hidden">
+        <div class="fantasy-panel border-4 border-yellow-300 rounded-3xl p-6 sm:p-8 max-w-lg w-full text-center relative shadow-2xl">
+            <div class="text-6xl mb-2">✨👻🍨✨</div>
+            <h2 class="text-2xl sm:text-3xl font-black text-amber-300 mb-2">Alexander is Glowing & Smiling!</h2>
+            <p class="text-xs sm:text-sm text-sky-100 font-semibold mb-4 leading-relaxed">
+                "HURRAY! That IS my yellow Sundae Hat! The autumn wind swept it into the enchanted well! Thank you for showing me that friends help each other instead of judging. Every Halloween, I shall hand out candies and smile with all children!"
+            </p>
+
+            <div class="bg-emerald-950/80 border-2 border-emerald-400 rounded-2xl p-3 mb-4 text-left">
+                <span class="text-xs font-extrabold uppercase text-emerald-300 block mb-1">🌟 Courage & Problem Solving Lesson:</span>
+                <p class="text-xs text-emerald-100">
+                    Never assume people mean harm. When someone is sad or angry, listen with kindness and work together to solve the real problem!
+                </p>
+            </div>
+
+            <div class="flex flex-wrap gap-2 justify-center">
+                <button onclick="readAloudVictory()" class="gold-btn text-purple-950 font-black px-4 py-2.5 rounded-2xl text-xs sm:text-sm">
+                    🔊 Listen to Lesson
+                </button>
+                <button onclick="advanceToNextStage()" class="blue-btn bg-gradient-to-r from-purple-600 to-indigo-600 border border-purple-300 text-white font-black px-5 py-2.5 rounded-2xl text-xs sm:text-sm shadow-[0_0_20px_rgba(168,85,247,0.7)] active:scale-95 transition">
+                    Proceed to Stage 2! 🚀
+                </button>
+                <button onclick="closeVictoryModal()" class="hud-pill text-sky-200 font-bold px-4 py-2 rounded-2xl text-xs">
+                    Stay & Explore
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- ========================================================================= -->
+    <!-- SCENE TRANSITION OVERLAY (FADE TO BLACK)                                  -->
+    <!-- ========================================================================= -->
+    <div id="transitionScreen" class="fixed inset-0 z-[100] bg-black flex flex-col items-center justify-center transition-opacity duration-700 opacity-0 pointer-events-none hidden">
+        <div class="text-6xl animate-bounce mb-4">🚪</div>
+        <h1 id="transitionTitle" class="text-3xl sm:text-5xl text-fuchsia-400 font-black mb-2 tracking-wide">Entering Area...</h1>
+        <p class="text-sky-200 text-sm sm:text-base font-bold animate-pulse">Loading new spooky adventure...</p>
+    </div>
+
+    <!-- ========================================================================= -->
+    <!-- BUILDING INTERIOR EXPLORATION MODAL (MIDNIGHT SCHOOL INTERIOR)            -->
+    <!-- ========================================================================= -->
+    <div id="interiorModal" class="fixed inset-0 z-[60] bg-slate-950 hidden flex-col select-none overflow-hidden">
+        <!-- Interior Header -->
+        <div class="bg-indigo-950/90 px-4 py-3 sm:px-6 sm:py-4 border-b-2 border-indigo-500/50 flex items-center justify-between z-10 shadow-lg">
+            <div class="flex items-center gap-3">
+                <span id="interiorIcon" class="text-3xl sm:text-4xl">🏫</span>
+                <div>
+                    <h2 id="interiorTitle" class="text-xl sm:text-2xl font-black text-amber-300">Midnight Academy: Classroom 101</h2>
+                    <span class="text-xs text-sky-200">Stage 2: The Grumpy Mummy & The Stolen Papyrus</span>
+                </div>
+            </div>
+            <div class="flex items-center gap-2">
+                <button onclick="readAloudMummyStory()" class="hud-pill px-3 py-1.5 rounded-xl text-xs font-bold text-sky-200 flex items-center gap-1.5">
+                    <i class="fa-solid fa-volume-high"></i>
+                    <span class="hidden sm:inline">Story Audio</span>
+                </button>
+                <button onclick="exitBuilding()" class="gold-btn px-4 py-2 rounded-xl text-purple-950 font-black text-xs sm:text-sm active:scale-95 transition flex items-center gap-1.5">
+                    <span>🚪 Exit to Courtyard</span>
+                </button>
+            </div>
+        </div>
+
+        <!-- School Interior Interactive Viewport -->
+        <div class="flex-1 relative overflow-hidden bg-gradient-to-b from-[#0b0f26] via-[#141b3d] to-[#070a1a] flex flex-col items-center justify-between p-4 sm:p-6">
+            
+            <!-- Floating Classroom Target Pin -->
+            <div id="mummyQuestPin" class="fantasy-panel px-4 py-2 rounded-2xl border-2 border-amber-400 shadow-xl flex items-center gap-3 mb-2 z-10 max-w-md w-full">
+                <div class="w-12 h-12 bg-amber-400/20 rounded-xl border border-amber-300 flex items-center justify-center shrink-0">
+                    <span class="text-2xl">📜</span>
+                </div>
+                <div>
+                    <span class="text-[9px] font-black uppercase tracking-wider text-amber-300 block">Classroom Quest</span>
+                    <span class="text-xs font-black text-white block">Missing Golden Papyrus: "I am a lord"</span>
+                    <span class="text-[10px] text-sky-200">Search student desks, bookshelves, and lockers!</span>
+                </div>
+            </div>
+
+            <!-- Classroom Diorama Visual Stage -->
+            <div class="relative w-full max-w-4xl h-[55vh] rounded-3xl bg-indigo-950/60 border-2 border-sky-400/30 shadow-2xl p-4 flex flex-col justify-between overflow-hidden">
+                <!-- Chalkboard and Wizard Headmaster at the front -->
+                <div class="flex items-start justify-between">
+                    <!-- Headmaster Wizard NPC -->
+                    <div onclick="talkToHeadmaster()" class="flex flex-col items-center cursor-pointer group">
+                        <div class="w-16 h-16 rounded-2xl bg-indigo-900 border-2 border-purple-400 flex items-center justify-center text-4xl shadow-[0_0_20px_rgba(168,85,247,0.5)] group-hover:scale-105 transition">
+                            🧙‍♂️
+                        </div>
+                        <span class="text-[11px] font-black text-purple-300 mt-1">Headmaster Eldrin</span>
+                        <span class="text-[9px] bg-purple-950/80 text-sky-300 px-1.5 py-0.5 rounded border border-purple-400/30">Click to Talk</span>
+                    </div>
+
+                    <!-- Chalkboard with message -->
+                    <div class="flex-1 mx-4 bg-emerald-950/90 border-4 border-amber-900 rounded-2xl p-3 shadow-inner text-center">
+                        <span class="text-xs font-mono font-bold text-emerald-300 tracking-widest block mb-1">MIDNIGHT LESSON: EMPATHY & SHARING</span>
+                        <p class="text-xs font-sans text-amber-100 italic">"Books and knowledge belong to all curious hearts. If something is lost, seek it with patience!"</p>
+                    </div>
+
+                    <!-- Skeleton Hall Monitor NPC -->
+                    <div onclick="talkToSkeletonMonitor()" class="flex flex-col items-center cursor-pointer group">
+                        <div class="w-16 h-16 rounded-2xl bg-slate-900 border-2 border-emerald-400 flex items-center justify-center text-4xl shadow-[0_0_20px_rgba(16,185,129,0.5)] group-hover:scale-105 transition">
+                            💀
+                        </div>
+                        <span class="text-[11px] font-black text-emerald-300 mt-1">Bones (Hall Monitor)</span>
+                        <span class="text-[9px] bg-slate-950/80 text-emerald-200 px-1.5 py-0.5 rounded border border-emerald-400/30">Click to Talk</span>
+                    </div>
+                </div>
+
+                <!-- Center Area: Animated Wandering Mummy Spirit -->
+                <div class="flex justify-center items-center my-2">
+                    <div id="mummySpriteCard" onclick="talkToMummy()" class="relative flex flex-col items-center cursor-pointer group transition-all duration-300 hover:scale-105">
+                        <!-- Floating Mood / Scare Bubble -->
+                        <div id="mummyThoughtBubble" class="mb-1 bg-yellow-400 text-purple-950 font-black text-xs px-3 py-1 rounded-full border border-white shadow-lg animate-bounce flex items-center gap-1">
+                            <span>"Give back my paper: 'I am a lord'!"</span>
+                            <span>📜</span>
+                        </div>
+                        <div class="w-24 h-24 rounded-3xl bg-amber-900/40 border-4 border-amber-400 flex items-center justify-center text-6xl shadow-[0_0_35px_rgba(245,158,11,0.6)]">
+                            <span id="mummyEmoji" class="animate-pulse">🤕</span>
+                        </div>
+                        <span class="text-sm font-black text-amber-300 mt-1">Prince Ramses (Mummy Spirit)</span>
+                        <span class="text-[10px] text-sky-200">Grumpy & Mistaken • Click to Interact</span>
+                    </div>
+                </div>
+
+                <!-- Interactive Classroom Furniture (Desks, Lockers, Bookshelf) -->
+                <div class="grid grid-cols-4 gap-2 sm:gap-4 z-10">
+                    <!-- Desk 1: Student Desk (Left) -->
+                    <div onclick="searchSchoolItem('desk1')" class="bg-amber-950/70 hover:bg-amber-900/80 border-2 border-amber-600 rounded-2xl p-2.5 flex flex-col items-center cursor-pointer transition active:scale-95 text-center">
+                        <span class="text-3xl mb-1">🪑</span>
+                        <span class="text-xs font-black text-amber-200">Oak Desk A</span>
+                        <span class="text-[9px] text-sky-300">Click to Search</span>
+                    </div>
+
+                    <!-- Bookshelf (Hidden decoy papers) -->
+                    <div onclick="searchSchoolItem('bookshelf')" class="bg-indigo-950/80 hover:bg-indigo-900/80 border-2 border-sky-500 rounded-2xl p-2.5 flex flex-col items-center cursor-pointer transition active:scale-95 text-center">
+                        <span class="text-3xl mb-1">📚</span>
+                        <span class="text-xs font-black text-sky-200">Library Shelf</span>
+                        <span class="text-[9px] text-sky-300">Click to Search</span>
+                    </div>
+
+                    <!-- Blue Lockers (Hidden Decoy homework) -->
+                    <div onclick="searchSchoolItem('lockers')" class="bg-slate-900/80 hover:bg-slate-800/80 border-2 border-cyan-400 rounded-2xl p-2.5 flex flex-col items-center cursor-pointer transition active:scale-95 text-center">
+                        <span class="text-3xl mb-1">🗄️</span>
+                        <span class="text-xs font-black text-cyan-200">School Lockers</span>
+                        <span class="text-[9px] text-sky-300">Click to Search</span>
+                    </div>
+
+                    <!-- Teacher's Desk (Hides the REAL Golden Papyrus: "I am a lord") -->
+                    <div onclick="searchSchoolItem('teacherDesk')" class="bg-purple-950/80 hover:bg-purple-900/80 border-2 border-fuchsia-400 rounded-2xl p-2.5 flex flex-col items-center cursor-pointer transition active:scale-95 text-center">
+                        <span class="text-3xl mb-1">📖</span>
+                        <span class="text-xs font-black text-fuchsia-200">Teacher Podium</span>
+                        <span class="text-[9px] text-amber-300 font-bold">✨ Golden Glow</span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Classroom Dialogue Subtitle Box -->
+            <div id="schoolSubtitleBox" class="fantasy-panel mt-3 px-5 py-3 rounded-2xl border border-sky-400/40 w-full max-w-2xl text-center text-xs sm:text-sm font-bold text-sky-100 shadow-xl">
+                "Welcome to Midnight Academy! Click on Prince Ramses the Mummy or search the desks to help solve his misunderstanding!"
+            </div>
+        </div>
+    </div>
+
+    <!-- ========================================================================= -->
+    <!-- THREE.JS ENGINE & GAME SCRIPT                                             -->
+    <!-- ========================================================================= -->
+    <script>
+        // ---------------------------------------------------------------------
+        // WEB AUDIO SYNTHESIZER
+        // ---------------------------------------------------------------------
+        const AudioContextClass = window.AudioContext || window.webkitAudioContext;
+        let actx = null;
+        let soundEnabled = true;
+
+        function initAudio() {
+            if (!actx) actx = new AudioContextClass();
+            if (actx.state === 'suspended') actx.resume();
+        }
+
+        function playSound(type) {
+            if (!soundEnabled) return;
+            try {
+                initAudio();
+                const t = actx.currentTime;
+                const osc = actx.createOscillator();
+                const gain = actx.createGain();
+                osc.connect(gain);
+                gain.connect(actx.destination);
+
+                if (type === 'step') {
+                    osc.type = 'sine';
+                    osc.frequency.setValueAtTime(140, t);
+                    gain.gain.setValueAtTime(0.02, t);
+                    gain.gain.exponentialRampToValueAtTime(0.001, t + 0.04);
+                    osc.start(t);
+                    osc.stop(t + 0.04);
+                } else if (type === 'sonicStep') {
+                    osc.type = 'sawtooth';
+                    osc.frequency.setValueAtTime(320, t);
+                    osc.frequency.exponentialRampToValueAtTime(120, t + 0.05);
+                    gain.gain.setValueAtTime(0.03, t);
+                    gain.gain.exponentialRampToValueAtTime(0.001, t + 0.05);
+                    osc.start(t);
+                    osc.stop(t + 0.05);
+                } else if (type === 'jump') {
+                    osc.type = 'sine';
+                    osc.frequency.setValueAtTime(260, t);
+                    osc.frequency.exponentialRampToValueAtTime(540, t + 0.16);
+                    gain.gain.setValueAtTime(0.1, t);
+                    gain.gain.exponentialRampToValueAtTime(0.001, t + 0.18);
+                    osc.start(t);
+                    osc.stop(t + 0.18);
+                } else if (type === 'shake') {
+                    osc.type = 'triangle';
+                    osc.frequency.setValueAtTime(160, t);
+                    osc.frequency.linearRampToValueAtTime(80, t + 0.2);
+                    gain.gain.setValueAtTime(0.12, t);
+                    gain.gain.exponentialRampToValueAtTime(0.001, t + 0.22);
+                    osc.start(t);
+                    osc.stop(t + 0.22);
+                } else if (type === 'pop') {
+                    osc.type = 'sine';
+                    osc.frequency.setValueAtTime(450, t);
+                    osc.frequency.exponentialRampToValueAtTime(850, t + 0.12);
+                    gain.gain.setValueAtTime(0.12, t);
+                    gain.gain.exponentialRampToValueAtTime(0.001, t + 0.14);
+                    osc.start(t);
+                    osc.stop(t + 0.14);
+                } else if (type === 'boo') {
+                    // Spooky comical swelling scare sound
+                    osc.type = 'sawtooth';
+                    osc.frequency.setValueAtTime(120, t);
+                    osc.frequency.linearRampToValueAtTime(380, t + 0.18);
+                    osc.frequency.linearRampToValueAtTime(90, t + 0.55);
+                    gain.gain.setValueAtTime(0.18, t);
+                    gain.gain.exponentialRampToValueAtTime(0.001, t + 0.6);
+                    osc.start(t);
+                    osc.stop(t + 0.6);
+                } else if (type === 'screech') {
+                    // Cute comedic scream from startled kid
+                    osc.type = 'sine';
+                    osc.frequency.setValueAtTime(580, t);
+                    osc.frequency.exponentialRampToValueAtTime(840, t + 0.15);
+                    osc.frequency.exponentialRampToValueAtTime(320, t + 0.35);
+                    gain.gain.setValueAtTime(0.08, t);
+                    gain.gain.exponentialRampToValueAtTime(0.001, t + 0.38);
+                    osc.start(t);
+                    osc.stop(t + 0.38);
+                } else if (type === 'pickup') {
+                    [523, 659, 784, 1046].forEach((f, i) => {
+                        const o = actx.createOscillator();
+                        const g = actx.createGain();
+                        o.connect(g);
+                        g.connect(actx.destination);
+                        o.type = 'sine';
+                        o.frequency.setValueAtTime(f, t + i * 0.05);
+                        g.gain.setValueAtTime(0.07, t + i * 0.05);
+                        g.gain.exponentialRampToValueAtTime(0.001, t + i * 0.05 + 0.18);
+                        o.start(t + i * 0.05);
+                        o.stop(t + i * 0.05 + 0.18);
+                    });
+                } else if (type === 'equip') {
+                    [440, 554, 659, 880].forEach((f, idx) => {
+                        const o = actx.createOscillator();
+                        const g = actx.createGain();
+                        o.connect(g);
+                        g.connect(actx.destination);
+                        o.type = 'triangle';
+                        o.frequency.setValueAtTime(f, t + idx * 0.07);
+                        g.gain.setValueAtTime(0.09, t + idx * 0.07);
+                        g.gain.exponentialRampToValueAtTime(0.001, t + idx * 0.07 + 0.2);
+                        o.start(t + idx * 0.07);
+                        o.stop(t + idx * 0.07 + 0.2);
+                    });
+                }
+            } catch (e) {
+                console.warn(e);
+            }
+        }
+
+        function toggleSound() {
+            soundEnabled = !soundEnabled;
+            const btn = document.getElementById('soundBtn');
+            btn.innerHTML = soundEnabled ? '<i class="fa-solid fa-volume-high text-xs"></i>' : '<i class="fa-solid fa-volume-xmark text-xs text-red-400"></i>';
+            if (!soundEnabled && 'speechSynthesis' in window) window.speechSynthesis.cancel();
+        }
+
+        function toggleFullscreen() {
+            if (!document.fullscreenElement) {
+                document.documentElement.requestFullscreen().catch(() => {});
+            } else {
+                document.exitFullscreen().catch(() => {});
+            }
+        }
+
+        // Web Speech API Narrator
+        function speak(text) {
+            if (!soundEnabled || !('speechSynthesis' in window)) return;
+            window.speechSynthesis.cancel();
+            const u = new SpeechSynthesisUtterance(text);
+            u.rate = 0.9;
+            u.pitch = 1.1;
+            window.speechSynthesis.speak(u);
+        }
+
+        // ---------------------------------------------------------------------
+        // DYNAMIC TARGET QUEST WIDGET SVG GENERATOR (Changes per Ghost/Stage)
+        // ---------------------------------------------------------------------
+        function setTargetQuestDisplay(type, name, desc, goalLabel = "Current Goal: Find This!") {
+            const widget = document.getElementById('targetQuestWidget');
+            const svgEl = document.getElementById('targetItemSvg');
+            const nameEl = document.getElementById('targetItemName');
+            const descEl = document.getElementById('targetItemDesc');
+            const labelEl = document.getElementById('targetGoalLabel');
+
+            if (nameEl) nameEl.innerText = name;
+            if (descEl) descEl.innerText = desc;
+            if (labelEl) labelEl.innerText = goalLabel;
+
+            if (svgEl) {
+                if (type === 'sundae_hat') {
+                    // Alexander's Yellow Sundae Hat
+                    svgEl.innerHTML = `
+                        <polygon points="50,15 20,80 80,80" fill="#facc15" stroke="#ca8a04" stroke-width="3" />
+                        <line x1="38" y1="45" x2="62" y2="45" stroke="#eab308" stroke-width="2" />
+                        <line x1="30" y1="62" x2="70" y2="62" stroke="#eab308" stroke-width="2" />
+                        <line x1="40" y1="28" x2="65" y2="78" stroke="#eab308" stroke-width="1.5" />
+                        <line x1="60" y1="28" x2="35" y2="78" stroke="#eab308" stroke-width="1.5" />
+                        <path d="M 22 75 C 28 85, 34 72, 42 84 C 50 72, 58 86, 68 74 C 74 82, 78 75, 78 75 L 80 80 L 20 80 Z" fill="#3e1f0e" />
+                        <circle cx="50" cy="15" r="7" fill="#ef4444" stroke="#991b1b" stroke-width="1.5" />
+                        <path d="M 50 10 Q 56 4 60 5" stroke="#15803d" stroke-width="2" fill="none" />
+                    `;
+                } else if (type === 'lord_papyrus') {
+                    // Mummy Prince Ramses's "I am a lord" Papyrus
+                    svgEl.innerHTML = `
+                        <rect x="18" y="16" width="64" height="68" rx="8" fill="#fef08a" stroke="#ca8a04" stroke-width="3" />
+                        <line x1="28" y1="28" x2="72" y2="28" stroke="#d97706" stroke-width="2.5" stroke-linecap="round" />
+                        <text x="50" y="48" font-size="11" font-weight="900" fill="#78350f" text-anchor="middle" font-family="sans-serif">"I am a lord"</text>
+                        <line x1="28" y1="60" x2="72" y2="60" stroke="#d97706" stroke-width="2" stroke-linecap="round" />
+                        <circle cx="50" cy="72" r="5" fill="#f59e0b" stroke="#b45309" stroke-width="1.5" />
+                    `;
+                } else if (type === 'star_blanket') {
+                    // Barnaby's Starlight Blanket
+                    svgEl.innerHTML = `
+                        <rect x="18" y="20" width="64" height="60" rx="10" fill="#3b82f6" stroke="#60a5fa" stroke-width="3" />
+                        <polygon points="50,30 53,39 62,39 55,44 58,53 50,47 42,53 45,44 38,39 47,39" fill="#fef08a" />
+                        <polygon points="30,55 32,61 38,61 33,65 35,71 30,67 25,71 27,65 22,61 28,61" fill="#fef08a" />
+                        <polygon points="70,55 72,61 78,61 73,65 75,71 70,67 65,71 67,65 62,61 68,61" fill="#fef08a" />
+                    `;
+                }
+            }
+            if (widget) widget.classList.remove('hidden');
+        }
+
+        function readAloudVictory() {
+            speak("Alexander is smiling and wearing his sundae hat again! He learned that people are kind and will deliver sweet treats to everyone every Halloween!");
+        }
+
+        let tickerTimeout;
+        function setTicker(text, icon = '✨') {
+            document.getElementById('tickerText').innerText = text;
+            const container = document.getElementById('tickerContainer');
+            const iconEl = document.getElementById('tickerIcon');
+            if (iconEl) iconEl.innerText = icon;
+            
+            if (container) {
+                container.classList.remove('hidden');
+                // Small delay to allow display:block to apply before changing opacity for transition
+                requestAnimationFrame(() => {
+                    container.classList.remove('opacity-0');
+                });
+                
+                clearTimeout(tickerTimeout);
+                tickerTimeout = setTimeout(() => {
+                    container.classList.add('opacity-0');
+                    setTimeout(() => container.classList.add('hidden'), 300);
+                }, 4000);
+            }
+        }
+
+        // ---------------------------------------------------------------------
+        // THREE.JS SCENE, CAMERA, RENDERER & GAME STATE INITIALIZATION
+        // ---------------------------------------------------------------------
+        const canvas = document.getElementById('canvas3d');
+        const renderer = new THREE.WebGLRenderer({ canvas, antialias: true, alpha: false });
+        renderer.setSize(window.innerWidth, window.innerHeight);
+        renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+        renderer.shadowMap.enabled = true;
+        renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+
+        const scene = new THREE.Scene();
+        scene.background = new THREE.Color(0x060919);
+        scene.fog = new THREE.FogExp2(0x0b112c, 0.015);
+
+        const camera = new THREE.PerspectiveCamera(45, window.innerWidth / window.innerHeight, 0.1, 200);
+        let camDist = 24;
+        let camTheta = 0;
+        let camPhi = 0.58;
+
+        // Game Inventory & State
+        let candies = 0;
+        let pumpkins = 0;
+        let gems = 0;
+        let hasSundaeHat = false;
+        let questCompleted = false;
+        let questActive = false;
+        let currentStage = 1; // Stage 1 = Alexander, Stage 2 = Barnaby
+        let equippedSkin = 'default';
+
+        const ownedSkins = {
+            default: true,
+            sonic: false,
+            skeleton: false,
+            wizard: false,
+            sundae: false
+        };
+
+        const clickableObjects = [];
+        const harvestables = [];
+        const droppedItems = [];
+        const floatingCrystals = [];
+        const floatingMiniGhosts = [];
+
+        const raycaster = new THREE.Raycaster();
+        const mouseVec = new THREE.Vector2();
+
+        function updateHUD() {
+            document.getElementById('topCandies').innerText = candies;
+            document.getElementById('topPumpkins').innerText = pumpkins;
+            document.getElementById('topGems').innerText = gems;
+
+            document.getElementById('bagCandiesCount').innerText = candies;
+            document.getElementById('bagPumpkinsCount').innerText = pumpkins;
+            document.getElementById('bagGemsCount').innerText = gems;
+
+            const totalItems = candies + pumpkins + gems + (hasSundaeHat ? 1 : 0);
+            document.getElementById('bagItemCount').innerText = totalItems;
+
+            const hatStatus = document.getElementById('bagSundaeStatus');
+            if (hasSundaeHat) {
+                hatStatus.innerText = "Found! 🍨";
+                hatStatus.className = "text-xs font-black text-amber-300";
+            } else {
+                hatStatus.innerText = "Not Found";
+                hatStatus.className = "text-xs font-black text-red-400";
+            }
+
+            const speedLabel = document.getElementById('speedStatLabel');
+            if (equippedSkin === 'sonic') {
+                speedLabel.innerText = "Speed: Sonic Boost (1.8x) ⚡";
+                speedLabel.className = "text-xs font-black text-cyan-300";
+            } else {
+                speedLabel.innerText = "Speed: Normal (1.0x)";
+                speedLabel.className = "text-xs font-black text-amber-300";
+            }
+        }
+
+        // ---------------------------------------------------------------------
+        // WORLD LIGHTING & ATMOSPHERE
+        // ---------------------------------------------------------------------
+        const ambientLight = new THREE.AmbientLight(0x38bdf8, 0.7);
+        scene.add(ambientLight);
+
+        const moonLight = new THREE.DirectionalLight(0xc084fc, 1.8);
+        moonLight.position.set(25, 45, 20);
+        moonLight.castShadow = true;
+        moonLight.shadow.mapSize.width = 2048;
+        moonLight.shadow.mapSize.height = 2048;
+        moonLight.shadow.camera.near = 0.5;
+        moonLight.shadow.camera.far = 100;
+        moonLight.shadow.camera.left = -35;
+        moonLight.shadow.camera.right = 35;
+        moonLight.shadow.camera.top = 35;
+        moonLight.shadow.camera.bottom = -35;
+        scene.add(moonLight);
+
+        // Ground & Terrain
+        const groundGeo = new THREE.PlaneGeometry(160, 160, 48, 48);
+        const groundMat = new THREE.MeshStandardMaterial({
+            color: 0x09112a,
+            roughness: 0.9,
+            metalness: 0.1
+        });
+        const ground = new THREE.Mesh(groundGeo, groundMat);
+        ground.rotation.x = -Math.PI / 2;
+        ground.receiveShadow = true;
+        scene.add(ground);
+
+        // Destination Decal (Target circle when clicking ground)
+        const destDecal = new THREE.Mesh(
+            new THREE.RingGeometry(0.35, 0.75, 24),
+            new THREE.MeshBasicMaterial({ color: 0x38bdf8, side: THREE.DoubleSide, transparent: true, opacity: 0.8 })
+        );
+        destDecal.rotation.x = -Math.PI / 2;
+        destDecal.visible = false;
+        scene.add(destDecal);
+
+        // Stepping Stone Winding Path (Matches the vertical winding map in image)
+        const pathPoints = [
+            new THREE.Vector3(0, 0.03, 24),
+            new THREE.Vector3(-3, 0.03, 18),
+            new THREE.Vector3(2, 0.03, 12),
+            new THREE.Vector3(-4, 0.03, 5),
+            new THREE.Vector3(3, 0.03, -2),
+            new THREE.Vector3(-2, 0.03, -9),
+            new THREE.Vector3(2, 0.03, -16),
+            new THREE.Vector3(0, 0.03, -23)
+        ];
+
+        const pathCurve = new THREE.CatmullRomCurve3(pathPoints);
+        const pathSteps = pathCurve.getPoints(36);
+        pathSteps.forEach(pt => {
+            const stone = new THREE.Mesh(
+                new THREE.CylinderGeometry(0.9 + Math.random() * 0.3, 1.0 + Math.random() * 0.3, 0.1, 10),
+                new THREE.MeshStandardMaterial({ color: 0x1e293b, roughness: 0.8 })
+            );
+            stone.position.set(pt.x + (Math.random() - 0.5) * 0.4, 0.05, pt.z + (Math.random() - 0.5) * 0.4);
+            stone.rotation.y = Math.random() * Math.PI;
+            stone.receiveShadow = true;
+            scene.add(stone);
+        });
+
+        // Floating Sky Crystals (Matching floating shards in top of image)
+        for (let i = 0; i < 8; i++) {
+            const cryGeo = new THREE.OctahedronGeometry(0.9 + Math.random() * 0.6);
+            const cryMat = new THREE.MeshStandardMaterial({
+                color: 0x38bdf8,
+                emissive: 0x0284c7,
+                emissiveIntensity: 0.8,
+                roughness: 0.2,
+                transparent: true,
+                opacity: 0.88
+            });
+            const crystal = new THREE.Mesh(cryGeo, cryMat);
+            const bx = (Math.random() - 0.5) * 45;
+            const bz = (Math.random() - 0.5) * 45;
+            const by = 8 + Math.random() * 7;
+            crystal.position.set(bx, by, bz);
+            scene.add(crystal);
+            floatingCrystals.push({ mesh: crystal, baseY: by, rotSpeed: 0.01 + Math.random() * 0.02 });
+        }
+
+        // ---------------------------------------------------------------------
+        // FLOATING HALLOWEEN MINI GHOSTS (Inspired by image: cyan & purple wisps)
+        // ---------------------------------------------------------------------
+        const miniGhostColors = [0x67e8f9, 0xc084fc, 0xa5f3fc, 0xe879f9];
+        for (let i = 0; i < 9; i++) {
+            const mgGroup = new THREE.Group();
+            const col = miniGhostColors[i % miniGhostColors.length];
+
+            const mgMat = new THREE.MeshStandardMaterial({
+                color: col,
+                emissive: col,
+                emissiveIntensity: 0.8,
+                transparent: true,
+                opacity: 0.85
+            });
+
+            // Marshmallow mini body
+            const mHead = new THREE.Mesh(new THREE.SphereGeometry(0.35, 12, 12), mgMat);
+            const mTail = new THREE.Mesh(new THREE.ConeGeometry(0.35, 0.5, 10), mgMat);
+            mTail.rotation.x = Math.PI;
+            mTail.position.y = -0.25;
+
+            // Spooky eyes
+            const eyeM = new THREE.MeshBasicMaterial({ color: 0x0f172a });
+            const mEyeL = new THREE.Mesh(new THREE.SphereGeometry(0.06, 6, 6), eyeM);
+            mEyeL.position.set(-0.1, 0.05, 0.32);
+            const mEyeR = mEyeL.clone();
+            mEyeR.position.x = 0.1;
+
+            // Optional angel halo or witch hat for variety
+            if (i % 2 === 0) {
+                const halo = new THREE.Mesh(new THREE.TorusGeometry(0.2, 0.03, 6, 12), new THREE.MeshBasicMaterial({ color: 0x38bdf8 }));
+                halo.rotation.x = Math.PI / 2;
+                halo.position.y = 0.45;
+                mgGroup.add(halo);
+            }
+
+            mgGroup.add(mHead, mTail, mEyeL, mEyeR);
+
+            const rx = (Math.random() - 0.5) * 36;
+            const rz = (Math.random() - 0.5) * 36;
+            const ry = 2.0 + Math.random() * 3.5;
+            mgGroup.position.set(rx, ry, rz);
+
+            scene.add(mgGroup);
+            floatingMiniGhosts.push({
+                group: mgGroup,
+                baseY: ry,
+                radius: 3 + Math.random() * 4,
+                speed: 0.4 + Math.random() * 0.5,
+                angle: Math.random() * Math.PI * 2,
+                center: new THREE.Vector3(rx, ry, rz)
+            });
+        }
+
+        // ---------------------------------------------------------------------
+        // INTERACTIVE HARVESTABLE PROPS (Trees, Bushes, Caverns, Cottage, Well)
+        // ---------------------------------------------------------------------
+        function registerClickableProp(rootObj) {
+            rootObj.traverse(child => {
+                if (child.isMesh) {
+                    child.userData = { parentHarvestable: rootObj };
+                    clickableObjects.push(child);
+                }
+            });
+        }
+
+        function createBush(x, z, name, dropType, drops) {
+            const group = new THREE.Group();
+            group.position.set(x, 0, z);
+            group.userData = { isHarvestable: true, name, dropType, dropsLeft: drops, shaking: false, shakeTime: 0 };
+
+            const bushMat = new THREE.MeshStandardMaterial({ color: 0x15803d, roughness: 0.7 });
+            const s1 = new THREE.Mesh(new THREE.SphereGeometry(1.3, 14, 14), bushMat);
+            s1.position.y = 1.0;
+            const s2 = new THREE.Mesh(new THREE.SphereGeometry(1.0, 12, 12), bushMat);
+            s2.position.set(-0.8, 0.7, 0.4);
+            const s3 = new THREE.Mesh(new THREE.SphereGeometry(1.0, 12, 12), bushMat);
+            s3.position.set(0.8, 0.7, -0.3);
+
+            group.add(s1, s2, s3);
+            scene.add(group);
+            harvestables.push(group);
+            registerClickableProp(group);
+            return group;
+        }
+
+        function createPumpkinTree(x, z) {
+            const group = new THREE.Group();
+            group.position.set(x, 0, z);
+            group.userData = { isHarvestable: true, name: "Ancient Pumpkin Tree", dropType: "pumpkin", dropsLeft: 3, shaking: false, shakeTime: 0 };
+
+            const trunk = new THREE.Mesh(new THREE.CylinderGeometry(0.7, 1.0, 5, 12), new THREE.MeshStandardMaterial({ color: 0x451a03, roughness: 0.9 }));
+            trunk.position.y = 2.5;
+
+            const fol1 = new THREE.Mesh(new THREE.SphereGeometry(2.4, 14, 14), new THREE.MeshStandardMaterial({ color: 0xb45309, roughness: 0.8 }));
+            fol1.position.y = 5.2;
+            const fol2 = new THREE.Mesh(new THREE.SphereGeometry(1.8, 12, 12), new THREE.MeshStandardMaterial({ color: 0xd97706, roughness: 0.8 }));
+            fol2.position.set(0.9, 6.2, 0.5);
+
+            // Hanging little pumpkin
+            const pMesh = new THREE.Mesh(new THREE.SphereGeometry(0.45, 10, 10), new THREE.MeshStandardMaterial({ color: 0xea580c }));
+            pMesh.position.set(-1.2, 3.8, 0.5);
+
+            group.add(trunk, fol1, fol2, pMesh);
+            scene.add(group);
+            harvestables.push(group);
+            registerClickableProp(group);
+        }
+
+        function createCavern(x, z, colorHex, levelText) {
+            const group = new THREE.Group();
+            group.position.set(x, 0, z);
+            group.userData = { isHarvestable: true, name: `Cavern of Gems (${levelText})`, dropType: "gem", dropsLeft: 2, shaking: false, shakeTime: 0 };
+
+            // Rock cave arch
+            const rockMat = new THREE.MeshStandardMaterial({ color: 0x1e293b, roughness: 0.9 });
+            const rockL = new THREE.Mesh(new THREE.DodecahedronGeometry(2.0), rockMat);
+            rockL.position.set(-1.8, 1.8, 0);
+            const rockR = new THREE.Mesh(new THREE.DodecahedronGeometry(2.0), rockMat);
+            rockR.position.set(1.8, 1.8, 0);
+            const rockTop = new THREE.Mesh(new THREE.DodecahedronGeometry(2.2), rockMat);
+            rockTop.position.set(0, 3.4, 0);
+
+            // Glowing Cave Interior
+            const portal = new THREE.Mesh(new THREE.PlaneGeometry(2.2, 2.6), new THREE.MeshBasicMaterial({ color: colorHex, side: THREE.DoubleSide }));
+            portal.position.set(0, 1.4, 0.1);
+
+            const cLight = new THREE.PointLight(colorHex, 2.0, 8);
+            cLight.position.set(0, 1.5, 0.8);
+
+            group.add(rockL, rockR, rockTop, portal, cLight);
+            scene.add(group);
+            harvestables.push(group);
+            registerClickableProp(group);
+        }
+
+        function createEnchantedWell(x, z) {
+            const group = new THREE.Group();
+            group.position.set(x, 0, z);
+            group.userData = { isHarvestable: true, name: "Enchanted Stone Well", dropType: "sundae", dropsLeft: 1, shaking: false, shakeTime: 0 };
+
+            const wellStone = new THREE.Mesh(new THREE.CylinderGeometry(1.6, 1.7, 1.4, 16, 1, true), new THREE.MeshStandardMaterial({ color: 0x334155, roughness: 0.8 }));
+            wellStone.position.y = 0.7;
+
+            const water = new THREE.Mesh(new THREE.CircleGeometry(1.5, 16), new THREE.MeshBasicMaterial({ color: 0x38bdf8 }));
+            water.rotation.x = -Math.PI / 2;
+            water.position.y = 0.9;
+
+            const roof = new THREE.Mesh(new THREE.ConeGeometry(2.0, 1.2, 4), new THREE.MeshStandardMaterial({ color: 0x78350f }));
+            roof.position.y = 3.2;
+            roof.rotation.y = Math.PI / 4;
+
+            const post1 = new THREE.Mesh(new THREE.CylinderGeometry(0.12, 0.12, 2.2), new THREE.MeshStandardMaterial({ color: 0x451a03 }));
+            post1.position.set(-1.2, 1.8, 0);
+            const post2 = post1.clone();
+            post2.position.x = 1.2;
+
+            const wellLight = new THREE.PointLight(0x38bdf8, 2, 7);
+            wellLight.position.set(0, 1.5, 0);
+
+            group.add(wellStone, water, roof, post1, post2, wellLight);
+            scene.add(group);
+            harvestables.push(group);
+            registerClickableProp(group);
+        }
+
+        // Spawn environment structures matching reference map
+        // Notice some bushes drop decoy hats like "frog_hat" and "pirate_hat"!
+        createBush(-6, 20, "Moonlit Berry Bush", "frog_hat", 1);
+        createBush(7, 14, "Enchanted Rose Bush", "candy", 3);
+        createBush(-7, 7, "Sparkling Shrub", "pirate_hat", 1);
+        createBush(8, -5, "Starlight Bush", "candy", 3);
+
+        createPumpkinTree(-8, 12);
+        createPumpkinTree(9, 3);
+        createPumpkinTree(-7, -14);
+
+        createCavern(-11, 4, 0xa855f7, "Level 01");
+        createCavern(11, -8, 0x06b6d4, "Level 02");
+        createCavern(-10, -20, 0xf59e0b, "Level 03");
+
+        // The Enchanted Well hides the real Yellow Sundae Hat!
+        createEnchantedWell(8, -18);
+
+        // ---------------------------------------------------------------------
+        // VILLAGE COTTAGES & CANDY STALL (Matches Reference Art & Enriches Scene)
+        // ---------------------------------------------------------------------
+        function createVillageHouse(x, z, roofColorHex, wallColorHex, rotY = 0) {
+            const house = new THREE.Group();
+            house.position.set(x, 0, z);
+            house.rotation.y = rotY;
+            house.userData = { isHarvestable: true, name: "Storybook Cottage", dropType: "candy", dropsLeft: 3, shaking: false, shakeTime: 0 };
+
+            // House Walls
+            const wallMat = new THREE.MeshStandardMaterial({ color: wallColorHex, roughness: 0.8 });
+            const walls = new THREE.Mesh(new THREE.BoxGeometry(4.2, 3.2, 3.6), wallMat);
+            walls.position.y = 1.6;
+            walls.castShadow = true;
+            walls.receiveShadow = true;
+
+            // Whimsical Steep Roof
+            const roofMat = new THREE.MeshStandardMaterial({ color: roofColorHex, roughness: 0.6 });
+            const roof = new THREE.Mesh(new THREE.ConeGeometry(3.6, 2.6, 4), roofMat);
+            roof.position.y = 4.3;
+            roof.rotation.y = Math.PI / 4;
+            roof.castShadow = true;
+
+            // Chimney with Smoke
+            const chimMat = new THREE.MeshStandardMaterial({ color: 0x334155, roughness: 0.9 });
+            const chimney = new THREE.Mesh(new THREE.BoxGeometry(0.7, 2.0, 0.7), chimMat);
+            chimney.position.set(1.2, 4.4, -0.6);
+
+            // Glowing Windows
+            const winMat = new THREE.MeshBasicMaterial({ color: 0xfef08a });
+            const winFront1 = new THREE.Mesh(new THREE.PlaneGeometry(0.8, 0.9), winMat);
+            winFront1.position.set(-1.1, 1.8, 1.82);
+            const winFront2 = new THREE.Mesh(new THREE.PlaneGeometry(0.8, 0.9), winMat);
+            winFront2.position.set(1.1, 1.8, 1.82);
+
+            // Door
+            const doorMat = new THREE.MeshStandardMaterial({ color: 0x451a03, roughness: 0.9 });
+            const door = new THREE.Mesh(new THREE.PlaneGeometry(1.0, 1.7), doorMat);
+            door.position.set(0, 0.85, 1.82);
+
+            // Warm Window Glow Light
+            const hLight = new THREE.PointLight(0xfde047, 1.8, 8);
+            hLight.position.set(0, 1.8, 2.2);
+
+            house.add(walls, roof, chimney, winFront1, winFront2, door, hLight);
+            scene.add(house);
+            harvestables.push(house);
+            registerClickableProp(house);
+            return house;
+        }
+
+        // Striped Candy Stall (Matching Image Reference: red-white stripes & wood counter)
+        function createCandyStall(x, z, rotY = 0) {
+            const stall = new THREE.Group();
+            stall.position.set(x, 0, z);
+            stall.rotation.y = rotY;
+            stall.userData = { isHarvestable: true, name: "Halloween Candy Stall", dropType: "candy", dropsLeft: 4, shaking: false, shakeTime: 0 };
+
+            // Wooden Counter
+            const counter = new THREE.Mesh(new THREE.BoxGeometry(3.6, 1.4, 1.6), new THREE.MeshStandardMaterial({ color: 0x5c2b14, roughness: 0.8 }));
+            counter.position.y = 0.7;
+
+            // Striped Awning Roof
+            const awning = new THREE.Mesh(new THREE.BoxGeometry(3.9, 0.35, 2.2), new THREE.MeshStandardMaterial({ color: 0xe11d48, roughness: 0.5 }));
+            awning.position.set(0, 2.9, 0.2);
+            awning.rotation.x = 0.2;
+
+            // Support Poles
+            const poleMat = new THREE.MeshStandardMaterial({ color: 0x334155 });
+            const p1 = new THREE.Mesh(new THREE.CylinderGeometry(0.08, 0.08, 1.6), poleMat);
+            p1.position.set(-1.6, 2.1, 0.8);
+            const p2 = p1.clone();
+            p2.position.x = 1.6;
+
+            // Front candy emblem
+            const emblem = new THREE.Mesh(new THREE.SphereGeometry(0.35, 12, 12), new THREE.MeshBasicMaterial({ color: 0xfbbf24 }));
+            emblem.position.set(0, 0.8, 0.82);
+
+            const sLight = new THREE.PointLight(0xfbbf24, 2.2, 7);
+            sLight.position.set(0, 2.2, 0.5);
+
+            stall.add(counter, awning, p1, p2, emblem, sLight);
+            scene.add(stall);
+            harvestables.push(stall);
+            registerClickableProp(stall);
+        }
+
+        // Add 3 charming cottages and a candy stall along the path
+        createVillageHouse(-14, 16, 0x7c3aed, 0x1e1b4b, 0.35); // Violet fairy cottage
+        createVillageHouse(13, 8, 0xd97706, 0x312e81, -0.4);   // Amber-roofed cottage
+        createVillageHouse(-13, -8, 0x0284c7, 0x0f172a, 0.2);  // Blue-roofed cottage
+        createCandyStall(7, 2, -0.2);                           // Candy shop stall matching screenshot
+
+        // ---------------------------------------------------------------------
+        // PHYSICAL ITEM DROPS & VACUUM PICKUP
+        // ---------------------------------------------------------------------
+        function spawnDroppedItem(type, spawnPos) {
+            const dropGroup = new THREE.Group();
+            dropGroup.position.copy(spawnPos);
+            dropGroup.position.y += 1.8;
+
+            let mesh;
+            if (type === 'candy') {
+                mesh = new THREE.Group();
+                // Striped Wrapped Halloween Candy
+                const candyBody = new THREE.Mesh(
+                    new THREE.CylinderGeometry(0.24, 0.24, 0.55, 12),
+                    new THREE.MeshStandardMaterial({ color: 0xf43f5e, emissive: 0xbe123c, emissiveIntensity: 0.4 })
+                );
+                candyBody.rotation.z = Math.PI / 2;
+
+                const stripe = new THREE.Mesh(
+                    new THREE.TorusGeometry(0.25, 0.05, 8, 16),
+                    new THREE.MeshStandardMaterial({ color: 0xfef08a })
+                );
+                stripe.rotation.y = Math.PI / 2;
+
+                const endMat = new THREE.MeshStandardMaterial({ color: 0xfb7185 });
+                const leftEnd = new THREE.Mesh(new THREE.ConeGeometry(0.28, 0.3, 8), endMat);
+                leftEnd.position.x = -0.38;
+                leftEnd.rotation.z = Math.PI / 2;
+                const rightEnd = new THREE.Mesh(new THREE.ConeGeometry(0.28, 0.3, 8), endMat);
+                rightEnd.position.x = 0.38;
+                rightEnd.rotation.z = -Math.PI / 2;
+
+                mesh.add(candyBody, stripe, leftEnd, rightEnd);
+            } else if (type === 'pumpkin') {
+                mesh = new THREE.Group();
+                const pBody = new THREE.Mesh(new THREE.SphereGeometry(0.42, 12, 12), new THREE.MeshStandardMaterial({ color: 0xf97316, emissive: 0xc2410c, emissiveIntensity: 0.5 }));
+                pBody.scale.set(1.2, 0.95, 1.2);
+                const stem = new THREE.Mesh(new THREE.CylinderGeometry(0.06, 0.08, 0.25), new THREE.MeshStandardMaterial({ color: 0x15803d }));
+                stem.position.y = 0.45;
+                mesh.add(pBody, stem);
+            } else if (type === 'gem') {
+                mesh = new THREE.Mesh(new THREE.OctahedronGeometry(0.4), new THREE.MeshStandardMaterial({ color: 0x38bdf8, emissive: 0x0284c7, emissiveIntensity: 0.7 }));
+            } else if (type === 'frog_hat') {
+                // Decoy 1: Green Frog Hat
+                mesh = new THREE.Group();
+                const cap = new THREE.Mesh(new THREE.SphereGeometry(0.38, 12, 12), new THREE.MeshStandardMaterial({ color: 0x22c55e }));
+                const eye1 = new THREE.Mesh(new THREE.SphereGeometry(0.12, 8, 8), new THREE.MeshStandardMaterial({ color: 0xffffff }));
+                eye1.position.set(-0.2, 0.3, 0.15);
+                const eye2 = eye1.clone();
+                eye2.position.x = 0.2;
+                mesh.add(cap, eye1, eye2);
+            } else if (type === 'pirate_hat') {
+                // Decoy 2: Blue Pirate Tricorn Hat
+                mesh = new THREE.Group();
+                const pDome = new THREE.Mesh(new THREE.ConeGeometry(0.4, 0.45, 3), new THREE.MeshStandardMaterial({ color: 0x1e3a8a }));
+                pDome.rotation.y = Math.PI / 6;
+                const brim = new THREE.Mesh(new THREE.CylinderGeometry(0.55, 0.55, 0.08, 16), new THREE.MeshStandardMaterial({ color: 0x172554 }));
+                brim.position.y = -0.15;
+                mesh.add(pDome, brim);
+            } else if (type === 'sundae') {
+                // The actual Target Sundae Hat!
+                mesh = new THREE.Group();
+                const cone = new THREE.Mesh(new THREE.ConeGeometry(0.35, 0.7, 12), new THREE.MeshStandardMaterial({ color: 0xfacc15, emissive: 0xca8a04, emissiveIntensity: 0.2 }));
+                const drip = new THREE.Mesh(new THREE.TorusGeometry(0.28, 0.08, 8, 16), new THREE.MeshStandardMaterial({ color: 0x3e1f0e }));
+                drip.rotation.x = Math.PI / 2;
+                drip.position.y = -0.15;
+                const cherry = new THREE.Mesh(new THREE.SphereGeometry(0.1, 8, 8), new THREE.MeshStandardMaterial({ color: 0xdc2626 }));
+                cherry.position.y = 0.55;
+                mesh.add(cone, drip, cherry);
+            }
+
+            dropGroup.add(mesh);
+            scene.add(dropGroup);
+
+            // Pop velocity
+            const angle = Math.random() * Math.PI * 2;
+            const dropData = {
+                group: dropGroup,
+                type: type,
+                velX: Math.cos(angle) * (2.5 + Math.random() * 2),
+                velZ: Math.sin(angle) * (2.5 + Math.random() * 2),
+                velY: 4.5 + Math.random() * 2,
+                landed: false
+            };
+
+            dropGroup.traverse(c => {
+                if (c.isMesh) {
+                    c.userData = { isPickup: true, dropRef: dropData };
+                    clickableObjects.push(c);
+                }
+            });
+
+            droppedItems.push(dropData);
+            playSound('pop');
+        }
+
+        let wrongBannerTimeout = null;
+        function showWrongItemNotification(name, icon, explanation) {
+            const banner = document.getElementById('wrongItemBanner');
+            document.getElementById('wrongItemIcon').innerText = icon;
+            document.getElementById('wrongItemDesc').innerHTML = `You clicked a ${name}! Alexander needs his <strong>Yellow Sundae Hat</strong> (yellow cone with chocolate)!`;
+            banner.classList.remove('hidden');
+
+            playSound('screech');
+            speak(`This is a ${name}, not Alexander's yellow sundae hat! Keep looking!`);
+
+            if (wrongBannerTimeout) clearTimeout(wrongBannerTimeout);
+            wrongBannerTimeout = setTimeout(() => {
+                banner.classList.add('hidden');
+            }, 3500);
+        }
+
+        function pickupItem(dropData) {
+            const idx = droppedItems.indexOf(dropData);
+            if (idx !== -1) droppedItems.splice(idx, 1);
+
+            scene.remove(dropData.group);
+
+            if (dropData.type === 'candy') {
+                playSound('pickup');
+                candies++;
+                setTicker("Picked up 1 Golden Candy! 🍬 Check your Bag or Shop!");
+            } else if (dropData.type === 'pumpkin') {
+                playSound('pickup');
+                pumpkins++;
+                setTicker("Picked up 1 Magic Pumpkin! 🎃 Great for spooky costumes!");
+            } else if (dropData.type === 'gem') {
+                playSound('pickup');
+                gems++;
+                setTicker("Picked up 1 Mystic Gem! 💎 High value exchange item!");
+            } else if (dropData.type === 'frog_hat') {
+                showWrongItemNotification("Green Frog Hat", "🐸", "Alexander does not wear a frog hat!");
+                setTicker("❌ That's a Green Frog Hat, not Alexander's Sundae Hat!");
+            } else if (dropData.type === 'pirate_hat') {
+                showWrongItemNotification("Blue Pirate Hat", "🏴‍☠️", "Alexander does not wear a pirate hat!");
+                setTicker("❌ That's a Pirate Hat, not Alexander's Sundae Hat!");
+            } else if (dropData.type === 'sundae') {
+                playSound('pickup');
+                hasSundaeHat = true;
+                setTicker("🌟 BINGO! YOU FOUND ALEXANDER'S YELLOW SUNDAE HAT! 🍨");
+                speak("Bingo! You found Alexander's yellow Sundae Hat! Bring it to Alexander now!");
+            }
+
+            updateHUD();
+        }
+
+        // ---------------------------------------------------------------------
+        // GHOST ALEXANDER 3D (Autonomous Living Patrol & Dynamic Scare Cycle)
+        // ---------------------------------------------------------------------
+        const alexanderGroup = new THREE.Group();
+        alexanderGroup.position.set(0, 3.2, 10);
+        scene.add(alexanderGroup);
+
+        const ghostMat = new THREE.MeshStandardMaterial({
+            color: 0xf8fafc,
+            roughness: 0.2,
+            metalness: 0.1,
+            emissive: 0x9333ea,
+            emissiveIntensity: 0.6,
+            transparent: true,
+            opacity: 0.95
+        });
+
+        const gHead = new THREE.Mesh(new THREE.SphereGeometry(1.2, 24, 24), ghostMat);
+        const gBody = new THREE.Mesh(new THREE.CylinderGeometry(1.2, 1.4, 1.3, 24), ghostMat);
+        gBody.position.y = -0.65;
+
+        // Rippled skirt
+        const gSkirt = new THREE.Group();
+        gSkirt.position.y = -1.3;
+        for (let i = 0; i < 6; i++) {
+            const a = (i / 6) * Math.PI * 2;
+            const rip = new THREE.Mesh(new THREE.SphereGeometry(0.3, 10, 10), ghostMat);
+            rip.position.set(Math.cos(a) * 1.25, 0, Math.sin(a) * 1.25);
+            gSkirt.add(rip);
+        }
+
+        // Cute face with expressive eyes
+        const darkMat = new THREE.MeshBasicMaterial({ color: 0x18181b });
+        const gEyeL = new THREE.Mesh(new THREE.SphereGeometry(0.18, 12, 12), darkMat);
+        gEyeL.position.set(-0.38, 0.1, 1.1);
+        const gEyeR = new THREE.Mesh(new THREE.SphereGeometry(0.18, 12, 12), darkMat);
+        gEyeR.position.set(0.38, 0.1, 1.1);
+
+        const gCheekMat = new THREE.MeshBasicMaterial({ color: 0xf472b6 });
+        const gCheekL = new THREE.Mesh(new THREE.SphereGeometry(0.14, 10, 10), gCheekMat);
+        gCheekL.position.set(-0.58, -0.05, 1.0);
+        const gCheekR = new THREE.Mesh(new THREE.SphereGeometry(0.14, 10, 10), gCheekMat);
+        gCheekR.position.set(0.58, -0.05, 1.0);
+
+        const gMouth = new THREE.Mesh(new THREE.TorusGeometry(0.16, 0.05, 8, 16, Math.PI), darkMat);
+        gMouth.position.set(0, -0.22, 1.12);
+
+        // Alexander's Equipped Hat (Hidden until quest solved)
+        const ghostEquippedHat = new THREE.Group();
+        ghostEquippedHat.position.set(0, 1.4, 0);
+        const ghCone = new THREE.Mesh(new THREE.ConeGeometry(0.65, 1.1, 16), new THREE.MeshStandardMaterial({ color: 0xfacc15 }));
+        const ghDrip = new THREE.Mesh(new THREE.TorusGeometry(0.5, 0.12, 10, 20), new THREE.MeshStandardMaterial({ color: 0x451a03 }));
+        ghDrip.rotation.x = Math.PI / 2;
+        ghDrip.position.y = -0.3;
+        const ghCherry = new THREE.Mesh(new THREE.SphereGeometry(0.14, 10, 10), new THREE.MeshStandardMaterial({ color: 0xdc2626 }));
+        ghCherry.position.y = 0.95;
+        ghostEquippedHat.add(ghCone, ghDrip, ghCherry);
+        ghostEquippedHat.visible = false;
+        alexanderGroup.add(ghostEquippedHat);
+
+        const ghostLight = new THREE.PointLight(0xa855f7, 2.5, 16);
+        ghostLight.position.set(0, 0.8, 0);
+
+        alexanderGroup.add(gHead, gBody, gSkirt, gEyeL, gEyeR, gCheekL, gCheekR, gMouth, ghostLight);
+
+        // Make Alexander clickable
+        alexanderGroup.traverse(child => {
+            if (child.isMesh) {
+                child.userData = { isAlexander: true };
+                clickableObjects.push(child);
+            }
+        });
+
+        // ---------------------------------------------------------------------
+        // PLAYGROUND NPC KIDS (Running around and reacting to Alexander)
+        // ---------------------------------------------------------------------
+        const npcKids = [];
+        const kidColors = [0xec4899, 0x10b981, 0x8b5cf6, 0xf59e0b];
+        const kidSpawnLocations = [
+            new THREE.Vector3(-4, 0, 15),
+            new THREE.Vector3(7, 0, 8),
+            new THREE.Vector3(-3, 0, -4),
+            new THREE.Vector3(5, 0, -14)
+        ];
+
+        kidSpawnLocations.forEach((loc, index) => {
+            const kidGroup = new THREE.Group();
+            kidGroup.position.copy(loc);
+
+            // Head & Body
+            const kHead = new THREE.Mesh(new THREE.SphereGeometry(0.65, 16, 16), new THREE.MeshStandardMaterial({ color: 0xffdfba }));
+            kHead.position.y = 1.85;
+            const kHair = new THREE.Mesh(new THREE.SphereGeometry(0.7, 14, 14), new THREE.MeshStandardMaterial({ color: 0x451a03 }));
+            kHair.position.set(0, 1.95, -0.05);
+
+            const kCoat = new THREE.Mesh(new THREE.CylinderGeometry(0.4, 0.5, 0.8, 14), new THREE.MeshStandardMaterial({ color: kidColors[index % kidColors.length] }));
+            kCoat.position.y = 1.05;
+
+            const kLegL = new THREE.Mesh(new THREE.CylinderGeometry(0.14, 0.12, 0.6), new THREE.MeshStandardMaterial({ color: 0x1e293b }));
+            kLegL.position.set(-0.2, 0.35, 0);
+            const kLegR = kLegL.clone();
+            kLegR.position.x = 0.2;
+
+            kidGroup.add(kHead, kHair, kCoat, kLegL, kLegR);
+            scene.add(kidGroup);
+
+            npcKids.push({
+                group: kidGroup,
+                basePos: loc.clone(),
+                targetPos: loc.clone(),
+                legL: kLegL,
+                legR: kLegR,
+                scaredTimer: 0,
+                walkCycle: Math.random() * Math.PI,
+                speed: 3.5
+            });
+        });
+
+        // Alexander AI State Machine (Living Patrol & Dynamic Swell/Shrink Scare)
+        const ghostAI = {
+            state: 'patrol', // 'patrol', 'swelling', 'scaring', 'shrinking', 'talking', 'happy'
+            previousState: 'patrol',
+            currentTargetKid: 0,
+            timer: 0,
+            scale: 1.0,
+            booTimer: 0
+        };
+
+        // ---------------------------------------------------------------------
+        // LIVE NON-BLOCKING DIALOGUE ENGINE
+        // ---------------------------------------------------------------------
+        function clickGhostAlexander() {
+            // PROXIMITY CHECK: Must be close to talk!
+            const dist = playerGroup.position.distanceTo(alexanderGroup.position);
+            if (dist > 10.0) {
+                setTicker("You are too far away! Walk closer to Alexander to talk to him!", "❌");
+                playSound('screech'); // Play small alert sound
+                // Flash the target circle at Alexander's feet to guide them
+                const indEl = document.getElementById('ghostIndicator');
+                indEl.classList.add('scale-125');
+                setTimeout(() => indEl.classList.remove('scale-125'), 300);
+                return;
+            }
+
+            // STOP Ghost from running or scaring immediately when clicked to talk!
+            if (ghostAI.state !== 'happy') {
+                ghostAI.previousState = ghostAI.state;
+                ghostAI.state = 'talking';
+                // Reset to normal gentle scale
+                ghostAI.scale = 1.0;
+                alexanderGroup.scale.setScalar(1.0);
+                ghostMat.emissive.setHex(0x9333ea);
+                darkMat.color.setHex(0x18181b);
+                // Turn towards player to speak directly
+                const toPlayer = new THREE.Vector3().subVectors(playerGroup.position, alexanderGroup.position);
+                toPlayer.y = 0;
+                if (toPlayer.length() > 0.1) {
+                    alexanderGroup.rotation.y = Math.atan2(toPlayer.x, toPlayer.z);
+                }
+                const booEl = document.getElementById('booFloatingTag');
+                if (booEl) booEl.classList.add('hidden');
+            }
+
+            if (questCompleted) {
+                setTicker("Ghost Alexander is peacefully wearing his Sundae Hat and smiling! 🍨👻", "✨");
+                speak("Thank you friend! I will spread sweet treats and joy to everyone!");
+                showLiveDialogue(
+                    "Ghost Alexander (Joyful Friend) 🍨",
+                    "Thank you so much, kind explorer! Because of you, I'll never scare anyone again. Every Halloween, I'll bring candies and smiles to every child!",
+                    "Stage 1 complete! Click 'Proceed to Stage 2' to meet Barnaby!",
+                    "🍨"
+                );
+                return;
+            }
+
+            if (hasSundaeHat) {
+                // Turn in Quest!
+                questCompleted = true;
+                ownedSkins.sundae = true;
+                ghostEquippedHat.visible = true;
+                ghostMat.color.setHex(0xfef08a);
+                ghostMat.emissive.setHex(0xfacc15);
+                ghostLight.color.setHex(0xfde047);
+                gMouth.rotation.z = Math.PI; // Big smile!
+                ghostAI.state = 'happy';
+
+                // HIDE target item widget completely upon completing Alexander's quest!
+                const targetWidget = document.getElementById('targetQuestWidget');
+                if (targetWidget) targetWidget.classList.add('hidden');
+
+                // Enable sundae hat button in shop
+                const sb = document.getElementById('btnSkin-sundae');
+                if (sb) {
+                    sb.innerText = "Equip";
+                    sb.className = "blue-btn px-3 py-1 rounded-xl text-xs font-black text-white";
+                }
+
+                confetti({ particleCount: 220, spread: 100, origin: { y: 0.6 } });
+                playSound('equip');
+                document.getElementById('victoryModal').classList.remove('hidden');
+                speak("Hurray! You found my yellow Sundae Hat! I am so happy!");
+            } else {
+                // Open Non-Blocking Live Dialogue HUD without dimming the 3D scene!
+                questActive = true;
+                setTargetQuestDisplay(
+                    'sundae_hat',
+                    'Yellow Sundae Hat',
+                    'Yellow cone + dripping chocolate + cherry'
+                );
+                
+                playSound('pop');
+                showLiveDialogue(
+                    "Ghost Alexander (Misunderstood Spirit) 👻",
+                    "Boo-hoo! My treasured Yellow Sundae Hat blew away in the midnight gale! I mistook it for theft and got grumpy, so I've been scaring the kids! Real friends help each other—will you help me find it?",
+                    "Search the bushes, ancient trees, cottages, or the Enchanted Well!",
+                    "👻"
+                );
+                speak("Boo-hoo! My yellow Sundae hat blew away! Please help me find it!");
+            }
+        }
+
+        // Advance to Stage 2 Quest
+        function advanceToNextStage() {
+            closeVictoryModal();
+            currentStage = 2;
+            document.getElementById('stageLabel').innerText = "Stage 2: The Mummy & Academy";
+
+            // Update Target Widget dynamically with the Stage 2 Mummy / School Quest Item!
+            setTargetQuestDisplay(
+                'lord_papyrus',
+                'Golden Papyrus: "I am a lord"',
+                'Find the ancient parchment inside the Midnight Academy Classroom!',
+                'Stage 2 Goal: Academy Mystery'
+            );
+
+            setTicker("STAGE 2 UNLOCKED! 🏫 Enter the Midnight Academy to solve the Mummy's mystery!");
+            speak("Welcome to Stage 2! Click on the Midnight School to enter the classroom and help the mummy find his royal decree!");
+            confetti({ particleCount: 160, spread: 70 });
+        }
+
+        // ---------------------------------------------------------------------
+        // MIDNIGHT SCHOOL INTERIOR LOGIC: MUMMY & "I AM A LORD" PAPYRUS QUEST
+        // ---------------------------------------------------------------------
+        let hasLordPapyrus = false;
+        let mummyQuestCompleted = false;
+
+        function readAloudMummyStory() {
+            speak("Prince Ramses the Mummy wrapped himself up and got angry because his royal paper that says 'I am a lord' vanished! He assumed the schoolchildren stole it, but it was just tucked away safely in the classroom!");
+        }
+
+        function talkToHeadmaster() {
+            playSound('pop');
+            const sub = document.getElementById('schoolSubtitleBox');
+            sub.innerHTML = "🧙‍♂️ <strong>Headmaster Eldrin:</strong> 'Greetings young traveler! Prince Ramses believes our students stole his golden decree. But our students only study mathematics and star-craft! Please search our desks to find his lost parchment!'";
+            speak("Headmaster Eldrin says: Prince Ramses believes our students stole his golden decree. Please search the desks to find his lost parchment!");
+        }
+
+        function talkToSkeletonMonitor() {
+            playSound('pop');
+            const sub = document.getElementById('schoolSubtitleBox');
+            sub.innerHTML = "💀 <strong>Bones (Hall Monitor):</strong> 'Clack-clack! I checked all hallway passes, nobody took the royal scroll! Try checking the Teacher's Podium or the library shelves!'";
+            speak("Bones the Hall Monitor says: Clack-clack! Nobody took the scroll! Check the Teacher's Podium or the bookshelves!");
+        }
+
+        function talkToMummy() {
+            playSound('boo');
+            const sub = document.getElementById('schoolSubtitleBox');
+
+            if (mummyQuestCompleted) {
+                sub.innerHTML = "👑 <strong>Prince Ramses:</strong> 'Thank you, kind friend! I am happily holding my decree: I am a lord! I will never scold or scare the schoolkids again, and I brought them ancient honey sweets!'";
+                speak("Prince Ramses says: Thank you! I have my royal decree! I will never scare the schoolkids again!");
+                return;
+            }
+
+            if (hasLordPapyrus) {
+                // Complete Mummy Quest!
+                mummyQuestCompleted = true;
+                candies += 8;
+                gems += 2;
+                updateHUD();
+
+                // Hide the main quest widget since this quest item has been handed in!
+                const targetWidget = document.getElementById('targetQuestWidget');
+                if (targetWidget) targetWidget.classList.add('hidden');
+                
+                document.getElementById('mummyEmoji').innerText = "👑";
+                document.getElementById('mummyThoughtBubble').innerHTML = "<span>'I am a lord!' (Joyful & Peaceful)</span> 💖";
+                sub.innerHTML = "✨ <strong>Prince Ramses:</strong> 'BY OSIRIS! That IS my missing royal papyrus: <span class=\"text-amber-300 font-extrabold\">I am a lord</span>! The wind blew it onto the teacher's podium while I was napping! Forgive me for suspecting the students!'";
+                
+                confetti({ particleCount: 200, spread: 90 });
+                playSound('equip');
+                speak("Prince Ramses cheers: By Osiris! That is my missing papyrus: I am a lord! Forgive me for suspecting the students! Thank you for your kindness!");
+                
+                // Update pin
+                document.getElementById('mummyQuestPin').innerHTML = `
+                    <div class="w-12 h-12 bg-emerald-400/20 rounded-xl border border-emerald-300 flex items-center justify-center shrink-0">
+                        <span class="text-2xl">🌟</span>
+                    </div>
+                    <div>
+                        <span class="text-[9px] font-black uppercase tracking-wider text-emerald-300 block">Classroom Mystery Solved!</span>
+                        <span class="text-xs font-black text-white block">Ramses & Students are Best Friends!</span>
+                        <span class="text-[10px] text-emerald-200">Awarded +8 Candies and +2 Mystic Gems! 🍬</span>
+                    </div>
+                `;
+            } else {
+                // Activate/Refresh the target widget for the Mummy's papyrus
+                setTargetQuestDisplay(
+                    'lord_papyrus',
+                    'Golden Papyrus: "I am a lord"',
+                    'Search student desks, lockers, or the teacher podium!',
+                    'Classroom Goal'
+                );
+
+                sub.innerHTML = "🤕 <strong>Prince Ramses:</strong> 'Grrr! All these papers in the classroom... somebody must have taken my special golden scroll that says <span class=\"text-amber-300 font-extrabold\">\"I am a lord\"</span>! Bring it to me so I can rule in peace!'";
+                speak("Prince Ramses grumbles: Somebody took my special golden scroll that says: I am a lord! Please bring it to me!");
+            }
+        }
+
+        function searchSchoolItem(itemKey) {
+            playSound('shake');
+            const sub = document.getElementById('schoolSubtitleBox');
+
+            if (itemKey === 'desk1') {
+                playSound('pop');
+                candies += 1;
+                updateHUD();
+                sub.innerHTML = "📝 You searched Oak Desk A and found a <strong>Spooky Math Quiz</strong> (Grade: A+) and 1 Candy! But it's not the Mummy's papyrus!";
+                speak("You found a math test with an A plus, but not the mummy's papyrus!");
+            } else if (itemKey === 'bookshelf') {
+                playSound('pop');
+                sub.innerHTML = "📚 You browsed the Library Shelf and found an ancient fairy tale book: <em>'The Friendly Ghosts of Sunderland'</em>!";
+                speak("You found a fairy tale book, but no royal scroll!");
+            } else if (itemKey === 'lockers') {
+                playSound('pop');
+                pumpkins += 1;
+                updateHUD();
+                sub.innerHTML = "🗄️ You opened Locker #7 and found a toy skeleton bat and 1 Magic Pumpkin! Keep searching!";
+                speak("You found a toy bat and a pumpkin!");
+            } else if (itemKey === 'teacherDesk') {
+                if (!hasLordPapyrus) {
+                    hasLordPapyrus = true;
+                    playSound('pickup');
+                    confetti({ particleCount: 150, spread: 80 });
+                    sub.innerHTML = "🌟 <strong>EUREKA!</strong> Under the headmaster's quill, you uncovered the glowing golden papyrus inscribed with: <span class=\"text-yellow-300 font-black text-base\">'I am a lord'</span>! Click Prince Ramses to give it back!";
+                    speak("Eureka! You found the golden papyrus inscribed with: I am a lord! Return it to Prince Ramses!");
+                    
+                    document.getElementById('mummyQuestPin').classList.add('border-emerald-400');
+                    document.getElementById('mummyQuestPin').innerHTML = `
+                        <div class="w-12 h-12 bg-amber-400 rounded-xl border border-white flex items-center justify-center shrink-0 text-2xl shadow-lg">
+                            📜
+                        </div>
+                        <div>
+                            <span class="text-[9px] font-black uppercase tracking-wider text-emerald-300 block">Papyrus Recovered!</span>
+                            <span class="text-xs font-black text-yellow-300 block">"I am a lord" Papyrus in Bag!</span>
+                            <span class="text-[10px] text-white">Click Prince Ramses to return it!</span>
+                        </div>
+                    `;
+                } else {
+                    sub.innerHTML = "✨ You already picked up the royal papyrus! Hand it to Prince Ramses!";
+                }
+            }
+        }
+
+        function showLiveDialogue(speaker, body, hint, emoji) {
+            document.getElementById('dialogueSpeakerTitle').innerText = speaker;
+            document.getElementById('dialogueBodyText').innerHTML = body;
+            document.getElementById('dialogueHintText').innerText = hint;
+            document.getElementById('dialogueGhostEmoji').innerText = emoji || "👻";
+            document.getElementById('liveDialogueHUD').classList.remove('hidden');
+        }
+
+        function closeLiveDialogue() {
+            document.getElementById('liveDialogueHUD').classList.add('hidden');
+            // Resume ghost patrol if quest is not complete
+            if (!questCompleted && ghostAI.state === 'talking') {
+                ghostAI.state = 'patrol';
+            }
+        }
+
+        function closeVictoryModal() {
+            document.getElementById('victoryModal').classList.add('hidden');
+        }
+
+        // ---------------------------------------------------------------------
+        // SCENE TRANSITIONS & PORTALS (Entering Buildings)
+        // ---------------------------------------------------------------------
+        function enterBuilding(name, icon, themeColorHex) {
+            const dist = playerGroup.position.distanceTo(targetBuildingPos);
+            // Wait for player to walk close to the door before transitioning
+            // Handled inside the raycaster
+            
+            const transition = document.getElementById('transitionScreen');
+            document.getElementById('transitionTitle').innerText = `Entering ${name}...`;
+            transition.classList.remove('hidden');
+            
+            // Fade to black
+            requestAnimationFrame(() => {
+                transition.classList.remove('opacity-0');
+            });
+
+            playSound('pop');
+
+            // Wait for fade, then show interior
+            setTimeout(() => {
+                document.getElementById('interiorTitle').innerText = name;
+                document.getElementById('interiorIcon').innerText = icon;
+                document.getElementById('interiorModal').classList.remove('hidden');
+                document.getElementById('interiorModal').style.display = 'flex';
+                
+                // Fade out transition screen
+                transition.classList.add('opacity-0');
+                setTimeout(() => transition.classList.add('hidden'), 700);
+                
+                speak(`Welcome to the ${name}. A new adventure awaits!`);
+            }, 1000);
+        }
+
+        function exitBuilding() {
+            const transition = document.getElementById('transitionScreen');
+            document.getElementById('transitionTitle').innerText = `Returning to Town...`;
+            transition.classList.remove('hidden');
+            
+            requestAnimationFrame(() => {
+                transition.classList.remove('opacity-0');
+            });
+
+            playSound('step');
+
+            setTimeout(() => {
+                document.getElementById('interiorModal').classList.add('hidden');
+                document.getElementById('interiorModal').style.display = 'none';
+                
+                transition.classList.add('opacity-0');
+                setTimeout(() => transition.classList.add('hidden'), 700);
+                
+                // Step player slightly away from the door
+                playerGroup.position.z += 4; 
+                targetPos.copy(playerGroup.position);
+            }, 1000);
+        }
+
+        let targetBuildingPos = new THREE.Vector3();
+
+        // ---------------------------------------------------------------------
+        // PLAYER CHARACTER: CUTE ANIME GIRL WITH PURPLE BRAIDS & MAID DRESS
+        // Add 3 charming cottages and a candy stall along the path
+        createVillageHouse(-14, 16, 0x7c3aed, 0x1e1b4b, 0.35); // Violet fairy cottage
+        createVillageHouse(13, 8, 0xd97706, 0x312e81, -0.4);   // Amber-roofed cottage
+        createVillageHouse(-13, -8, 0x0284c7, 0x0f172a, 0.2);  // Blue-roofed cottage
+        createCandyStall(7, 2, -0.2);                           // Candy shop stall matching screenshot
+
+        // ---------------------------------------------------------------------
+        // NEW MAJOR LANDMARKS: SCHOOL, CHURCH, AND PARK
+        // ---------------------------------------------------------------------
+        
+        // 1. Midnight School (Portal)
+        function createSchool(x, z, rotY = 0) {
+            const group = new THREE.Group();
+            group.position.set(x, 0, z);
+            group.rotation.y = rotY;
+            group.userData = { isPortal: true, name: "Midnight School", icon: "🏫" };
+
+            // Brick Building Main Body
+            const brickMat = new THREE.MeshStandardMaterial({ color: 0x991b1b, roughness: 0.9 });
+            const mainBldg = new THREE.Mesh(new THREE.BoxGeometry(10, 6, 6), brickMat);
+            mainBldg.position.y = 3;
+            
+            // Roof
+            const roofMat = new THREE.MeshStandardMaterial({ color: 0x1e293b, roughness: 0.8 });
+            const roof = new THREE.Mesh(new THREE.ConeGeometry(8, 3, 4), roofMat);
+            roof.position.y = 7.5;
+            roof.rotation.y = Math.PI / 4;
+
+            // Clock Tower
+            const tower = new THREE.Mesh(new THREE.BoxGeometry(3, 10, 3.5), brickMat);
+            tower.position.set(0, 5, 1.5);
+            const clockFace = new THREE.Mesh(new THREE.CircleGeometry(1.2, 16), new THREE.MeshBasicMaterial({ color: 0xfef08a }));
+            clockFace.position.set(0, 8, 3.26);
+            
+            // Double Doors (The Clickable Portal)
+            const doorMat = new THREE.MeshStandardMaterial({ color: 0x451a03 });
+            const doors = new THREE.Mesh(new THREE.PlaneGeometry(2.5, 3), doorMat);
+            doors.position.set(0, 1.5, 3.01);
+            
+            // Portal Glow
+            const pLight = new THREE.PointLight(0xfef08a, 2.5, 12);
+            pLight.position.set(0, 2, 4);
+
+            group.add(mainBldg, roof, tower, clockFace, doors, pLight);
+            scene.add(group);
+            
+            group.traverse(child => {
+                if (child.isMesh) {
+                    child.userData = { parentPortal: group };
+                    clickableObjects.push(child);
+                }
+            });
+        }
+
+        // 2. Spooky Church / Cathedral (Portal)
+        function createChurch(x, z, rotY = 0) {
+            const group = new THREE.Group();
+            group.position.set(x, 0, z);
+            group.rotation.y = rotY;
+            group.userData = { isPortal: true, name: "Spooky Cathedral", icon: "⛪" };
+
+            const stoneMat = new THREE.MeshStandardMaterial({ color: 0x475569, roughness: 0.8 });
+            const hall = new THREE.Mesh(new THREE.BoxGeometry(6, 7, 12), stoneMat);
+            hall.position.y = 3.5;
+
+            const spire = new THREE.Mesh(new THREE.ConeGeometry(2.5, 12, 4), new THREE.MeshStandardMaterial({ color: 0x334155 }));
+            spire.position.set(0, 13, 4);
+            spire.rotation.y = Math.PI / 4;
+
+            const baseSpire = new THREE.Mesh(new THREE.BoxGeometry(4, 10, 4), stoneMat);
+            baseSpire.position.set(0, 5, 4);
+
+            // Glowing Stained Glass Window
+            const glassMat = new THREE.MeshBasicMaterial({ color: 0xc084fc });
+            const windowG = new THREE.Mesh(new THREE.PlaneGeometry(2, 4), glassMat);
+            windowG.position.set(0, 6, 6.01);
+
+            const pLight = new THREE.PointLight(0xc084fc, 2.5, 15);
+            pLight.position.set(0, 6, 7);
+
+            group.add(hall, spire, baseSpire, windowG, pLight);
+            scene.add(group);
+
+            group.traverse(child => {
+                if (child.isMesh) {
+                    child.userData = { parentPortal: group };
+                    clickableObjects.push(child);
+                }
+            });
+        }
+
+        // 3. Park Bench (Harvestable & Scenery)
+        function createParkBench(x, z, rotY = 0) {
+            const group = new THREE.Group();
+            group.position.set(x, 0, z);
+            group.rotation.y = rotY;
+            group.userData = { isHarvestable: true, name: "Autumn Park Bench", dropType: "candy", dropsLeft: 2, shaking: false, shakeTime: 0 };
+
+            const woodMat = new THREE.MeshStandardMaterial({ color: 0x78350f });
+            const seat = new THREE.Mesh(new THREE.BoxGeometry(3, 0.2, 1), woodMat);
+            seat.position.set(0, 0.6, 0);
+            const back = new THREE.Mesh(new THREE.BoxGeometry(3, 0.8, 0.2), woodMat);
+            back.position.set(0, 1.2, -0.4);
+            const leg1 = new THREE.Mesh(new THREE.BoxGeometry(0.2, 0.6, 0.8), new THREE.MeshStandardMaterial({ color: 0x1e293b }));
+            leg1.position.set(-1.2, 0.3, 0);
+            const leg2 = leg1.clone();
+            leg2.position.x = 1.2;
+
+            group.add(seat, back, leg1, leg2);
+            scene.add(group);
+            harvestables.push(group);
+            registerClickableProp(group);
+        }
+
+        // Expand Map Boundaries by placing these far out
+        createSchool(0, -38);             // School to the far North
+        createChurch(35, 0, -Math.PI/2);  // Church to the far East
+        
+        // Park Area to the West
+        createPumpkinTree(-28, -5);
+        createPumpkinTree(-34, 4);
+        createBush(-30, -1, "Park Shrub", "frog_hat", 1);
+        createParkBench(-30, 8, Math.PI/4);
+        createParkBench(-26, 6, Math.PI/3);
+
+        // ---------------------------------------------------------------------
+        // INTERACTIVE HALLOWEEN DECORATIONS & NARRATOR NPCs (Vampire, Bats, Jack-o'-Lantern)
+        // ---------------------------------------------------------------------
+        const folkloreNPCs = [];
+
+        function createFolkloreNPC(x, z, name, icon, loreTitle, loreText, colorHex) {
+            const group = new THREE.Group();
+            group.position.set(x, 0, z);
+
+            const baseMat = new THREE.MeshStandardMaterial({ color: colorHex, roughness: 0.5, emissive: colorHex, emissiveIntensity: 0.3 });
+            const body = new THREE.Mesh(new THREE.DodecahedronGeometry(1.2), baseMat);
+            body.position.y = 1.5;
+            body.castShadow = true;
+
+            const light = new THREE.PointLight(colorHex, 2.0, 8);
+            light.position.set(0, 1.8, 0);
+
+            group.add(body, light);
+            scene.add(group);
+
+            const npcData = { group, name, icon, loreTitle, loreText };
+            folkloreNPCs.push(npcData);
+
+            group.traverse(child => {
+                if (child.isMesh) {
+                    child.userData = { isFolkloreNPC: true, npcRef: npcData };
+                    clickableObjects.push(child);
+                }
+            });
+        }
+
+        // 1. Vampire Count Decorator
+        createFolkloreNPC(
+            12, 18, 
+            "Count Vlad (Vampire Sage)", 
+            "🧛‍♂️", 
+            "What is a Vampire & Halloween Folklore?", 
+            "Vampires are legendary creatures from European folklore! In ghost stories, they remind us of nocturnal autumn bats. Long ago, people used spooky stories to explain the changing of seasons and to stay safely inside by the warm fireplace during long autumn nights!",
+            0xdc2626
+        );
+
+        // 2. Spooky Bat Decorator
+        createFolkloreNPC(
+            -15, -4, 
+            "Barnaby Bat (Night Scout)", 
+            "🦇", 
+            "Why do we have Bats on Halloween?", 
+            "Bats are wonderful nocturnal animals that hunt insects at night! In ancient times, ancient autumn bonfires attracted many insects, which brought out bats. People began associating bats with autumn evenings, making them beloved symbols of Halloween night!",
+            0x7c3aed
+        );
+
+        // 3. Giant Jack-o'-Lantern Decorator
+        createFolkloreNPC(
+            0, 6, 
+            "Grand Pumpkin Spirit", 
+            "🎃", 
+            "What is Halloween & Where did it start?", 
+            "Halloween comes from an ancient festival called Samhain over 2,000 years ago! People believed the veil between worlds was thin at harvest time. They carved glowing lanterns from turnips and pumpkins to guide friendly spirits and welcome the new winter season with joy!",
+            0xf97316
+        );
+
+        let activeFolkloreNPC = null;
+        function showFolkloreModal(npc) {
+            activeFolkloreNPC = npc;
+            playSound('pop');
+            
+            // Populate and show the Live Dialogue HUD with lore
+            document.getElementById('dialogueSpeakerTitle').innerText = `${npc.name} ${npc.icon}`;
+            document.getElementById('dialogueBodyText').innerHTML = `<strong>${npc.loreTitle}</strong><br><br>${npc.loreText}`;
+            document.getElementById('dialogueHintText').innerText = "Click 'Read Aloud' to listen to this Halloween story with your parents!";
+            document.getElementById('dialogueGhostEmoji').innerText = npc.icon;
+            document.getElementById('liveDialogueHUD').classList.remove('hidden');
+
+            speak(npc.loreTitle + ". " + npc.loreText);
+        }
+
+        // ---------------------------------------------------------------------
+        // PHYSICAL ITEM DROPS & VACUUM PICKUP
+        // ---------------------------------------------------------------------
+        const playerGroup = new THREE.Group();
+        playerGroup.position.set(0, 0, 24); // Starts at base of winding path
+        scene.add(playerGroup);
+
+        const targetPos = new THREE.Vector3(0, 0, 24);
+        let isWalking = false;
+        let walkCycle = 0;
+        let isJumping = false;
+        let jumpVel = 0;
+        const gravity = 28;
+        let baseSpeed = 10.0;
+
+        // Soft porcelain anime skin
+        const skinMat = new THREE.MeshStandardMaterial({ color: 0xffe4d6, roughness: 0.6 });
+        const pHead = new THREE.Mesh(new THREE.SphereGeometry(0.85, 20, 20), skinMat);
+        pHead.position.y = 2.45;
+        pHead.castShadow = true;
+
+        // Big Anime Expressive Eyes (Lavender pupils with white reflections matching the image!)
+        const eyeWhiteMat = new THREE.MeshBasicMaterial({ color: 0xffffff });
+        const pupilMat = new THREE.MeshBasicMaterial({ color: 0x818cf8 });
+        const sparkleMat = new THREE.MeshBasicMaterial({ color: 0xffffff });
+
+        const pEyeWhiteL = new THREE.Mesh(new THREE.SphereGeometry(0.22, 10, 10), eyeWhiteMat);
+        pEyeWhiteL.position.set(-0.28, 2.48, 0.76);
+        const pPupilL = new THREE.Mesh(new THREE.SphereGeometry(0.15, 10, 10), pupilMat);
+        pPupilL.position.set(-0.28, 2.48, 0.88);
+        const pSparkleL = new THREE.Mesh(new THREE.SphereGeometry(0.05, 6, 6), sparkleMat);
+        pSparkleL.position.set(-0.25, 2.54, 0.98);
+
+        const pEyeWhiteR = pEyeWhiteL.clone();
+        pEyeWhiteR.position.x = 0.28;
+        const pPupilR = pPupilL.clone();
+        pPupilR.position.x = 0.28;
+        const pSparkleR = pSparkleL.clone();
+        pSparkleR.position.x = 0.31;
+
+        // Cute Rosy anime blush
+        const animeBlushMat = new THREE.MeshBasicMaterial({ color: 0xf472b6, transparent: true, opacity: 0.6 });
+        const pBlushL = new THREE.Mesh(new THREE.SphereGeometry(0.14, 8, 8), animeBlushMat);
+        pBlushL.position.set(-0.42, 2.32, 0.72);
+        const pBlushR = pBlushL.clone();
+        pBlushR.position.x = 0.42;
+
+        // Lavender/Purple Braided Pigtails (Hair from the illustration)
+        const hairMat = new THREE.MeshStandardMaterial({ color: 0x9333ea, roughness: 0.5 });
+        const pHairBase = new THREE.Mesh(new THREE.SphereGeometry(0.92, 18, 18), hairMat);
+        pHairBase.position.set(0, 2.58, -0.06);
+
+        // Twin braided pigtails with bows
+        const pBraidL = new THREE.Group();
+        pBraidL.position.set(-0.85, 2.4, 0);
+        const b1 = new THREE.Mesh(new THREE.SphereGeometry(0.24, 10, 10), hairMat);
+        b1.position.y = -0.15;
+        const b2 = new THREE.Mesh(new THREE.SphereGeometry(0.2, 10, 10), hairMat);
+        b2.position.set(-0.1, -0.4, 0.05);
+        const b3 = new THREE.Mesh(new THREE.SphereGeometry(0.18, 10, 10), hairMat);
+        b3.position.set(-0.15, -0.65, 0.1);
+        const bowMat = new THREE.MeshStandardMaterial({ color: 0x3b82f6 });
+        const bowMesh = new THREE.Mesh(new THREE.BoxGeometry(0.22, 0.15, 0.12), bowMat);
+        bowMesh.position.set(0, 0.08, 0.15);
+        pBraidL.add(b1, b2, b3, bowMesh);
+
+        const pBraidR = pBraidL.clone();
+        pBraidR.position.x = 0.85;
+        pBraidR.scale.x = -1;
+
+        // Gothic Maid Lolita Dress (Black bodice, white frilly collar, flowing blue dress)
+        const dressBlueMat = new THREE.MeshStandardMaterial({ color: 0x1e3a8a, roughness: 0.6 });
+        const dressFrillMat = new THREE.MeshStandardMaterial({ color: 0xf8fafc, roughness: 0.3 });
+        const bodiceMat = new THREE.MeshStandardMaterial({ color: 0x18181b, roughness: 0.4 });
+
+        // Bodice
+        const pTorso = new THREE.Mesh(new THREE.CylinderGeometry(0.48, 0.55, 0.9, 16), bodiceMat);
+        pTorso.position.y = 1.45;
+        pTorso.castShadow = true;
+
+        // White ruffled lace collar & apron ribbon
+        const pCollar = new THREE.Mesh(new THREE.TorusGeometry(0.48, 0.12, 8, 16), dressFrillMat);
+        pCollar.rotation.x = Math.PI / 2;
+        pCollar.position.y = 1.82;
+
+        const pBowFront = new THREE.Mesh(new THREE.BoxGeometry(0.28, 0.18, 0.12), new THREE.MeshBasicMaterial({ color: 0x1e293b }));
+        pBowFront.position.set(0, 1.72, 0.52);
+
+        // Flared gothic maid skirt
+        const pSkirt = new THREE.Mesh(new THREE.ConeGeometry(1.05, 1.1, 18), dressBlueMat);
+        pSkirt.position.y = 0.9;
+        pSkirt.castShadow = true;
+
+        const pSkirtLace = new THREE.Mesh(new THREE.TorusGeometry(1.04, 0.08, 8, 20), dressFrillMat);
+        pSkirtLace.rotation.x = Math.PI / 2;
+        pSkirtLace.position.y = 0.4;
+
+        // Slender legs & black mary-jane shoes
+        const pLegL = new THREE.Mesh(new THREE.CylinderGeometry(0.14, 0.12, 0.7, 10), new THREE.MeshStandardMaterial({ color: 0x18181b }));
+        pLegL.position.set(-0.25, 0.35, 0);
+        pLegL.castShadow = true;
+        const pLegR = pLegL.clone();
+        pLegR.position.x = 0.25;
+
+        // Glowing Halloween Lantern held in hand (Illuminating the dark doorway)
+        const lanternArm = new THREE.Group();
+        lanternArm.position.set(0.65, 1.45, 0.1);
+
+        const lChain = new THREE.Mesh(new THREE.CylinderGeometry(0.04, 0.04, 0.45), new THREE.MeshStandardMaterial({ color: 0x334155 }));
+        lChain.position.set(0.1, -0.15, 0.35);
+
+        const lCage = new THREE.Mesh(new THREE.CylinderGeometry(0.22, 0.28, 0.55, 6), new THREE.MeshStandardMaterial({ color: 0x1e293b, metalness: 0.6 }));
+        lCage.position.set(0.1, -0.45, 0.35);
+
+        const lanternLightGlow = new THREE.Mesh(new THREE.SphereGeometry(0.15, 8, 8), new THREE.MeshBasicMaterial({ color: 0x67e8f9 }));
+        lanternLightGlow.position.set(0.1, -0.45, 0.35);
+
+        const lanternPointLight = new THREE.PointLight(0x67e8f9, 3.2, 14);
+        lanternPointLight.position.set(0.1, -0.45, 0.35);
+
+        lanternArm.add(lChain, lCage, lanternLightGlow, lanternPointLight);
+
+        playerGroup.add(
+            pHead, pEyeWhiteL, pPupilL, pSparkleL, pEyeWhiteR, pPupilR, pSparkleR,
+            pBlushL, pBlushR, pHairBase, pBraidL, pBraidR,
+            pTorso, pCollar, pBowFront, pSkirt, pSkirtLace,
+            pLegL, pLegR, lanternArm
+        );
+
+        // ---------------------------------------------------------------------
+        // COSTUME ATTACHMENTS (Sonic Blue Spikes, Skeleton, Wizard, Sundae)
+        // ---------------------------------------------------------------------
+        const costumeGroup = new THREE.Group();
+        playerGroup.add(costumeGroup);
+
+        // 1. SONIC RUNNER ATTACHMENTS (Blue back spikes + running aura)
+        const sonicModel = new THREE.Group();
+        const sonicBlueMat = new THREE.MeshStandardMaterial({ color: 0x0284c7, roughness: 0.3, emissive: 0x0369a1, emissiveIntensity: 0.3 });
+        for (let i = 0; i < 3; i++) {
+            const spike = new THREE.Mesh(new THREE.ConeGeometry(0.35, 1.1, 10), sonicBlueMat);
+            spike.position.set(0, 2.6 - i * 0.45, -0.8 - i * 0.2);
+            spike.rotation.x = -1.2;
+            sonicModel.add(spike);
+        }
+        sonicModel.visible = false;
+        costumeGroup.add(sonicModel);
+
+        // 2. SKELETON COSTUME (Bone ribs + spooky skull glow)
+        const skeletonModel = new THREE.Group();
+        const boneMat = new THREE.MeshStandardMaterial({ color: 0xf8fafc, roughness: 0.4, emissive: 0x10b981, emissiveIntensity: 0.2 });
+        for (let i = 0; i < 3; i++) {
+            const rib = new THREE.Mesh(new THREE.TorusGeometry(0.62, 0.08, 6, 12, Math.PI), boneMat);
+            rib.position.set(0, 1.6 - i * 0.25, 0.1);
+            skeletonModel.add(rib);
+        }
+        skeletonModel.visible = false;
+        costumeGroup.add(skeletonModel);
+
+        // 3. WIZARD HAT
+        const wizardModel = new THREE.Mesh(new THREE.ConeGeometry(0.85, 1.6, 16), new THREE.MeshStandardMaterial({ color: 0x6b21a8, roughness: 0.5 }));
+        wizardModel.position.set(0, 3.8, 0);
+        wizardModel.visible = false;
+        costumeGroup.add(wizardModel);
+
+        // 4. SUNDAE HAT
+        const sundaeWearModel = new THREE.Group();
+        sundaeWearModel.position.set(0, 3.4, 0);
+        const swCone = new THREE.Mesh(new THREE.ConeGeometry(0.5, 0.9, 12), new THREE.MeshStandardMaterial({ color: 0xfacc15 }));
+        const swDrip = new THREE.Mesh(new THREE.TorusGeometry(0.4, 0.1, 8, 16), new THREE.MeshStandardMaterial({ color: 0x451a03 }));
+        swDrip.rotation.x = Math.PI / 2;
+        swDrip.position.y = -0.25;
+        const swCherry = new THREE.Mesh(new THREE.SphereGeometry(0.12, 8, 8), new THREE.MeshStandardMaterial({ color: 0xdc2626 }));
+        swCherry.position.y = 0.75;
+        sundaeWearModel.add(swCone, swDrip, swCherry);
+        sundaeWearModel.visible = false;
+        costumeGroup.add(sundaeWearModel);
+
+        function applyCostume(id) {
+            equippedSkin = id;
+            sonicModel.visible = (id === 'sonic');
+            skeletonModel.visible = (id === 'skeleton');
+            wizardModel.visible = (id === 'wizard');
+            sundaeWearModel.visible = (id === 'sundae');
+
+            if (id === 'sonic') {
+                dressBlueMat.color.setHex(0x0284c7);
+                lanternLightGlow.material.color.setHex(0x38bdf8);
+                lanternPointLight.color.setHex(0x38bdf8);
+            } else if (id === 'skeleton') {
+                dressBlueMat.color.setHex(0x0f172a);
+                lanternLightGlow.material.color.setHex(0x10b981);
+                lanternPointLight.color.setHex(0x10b981);
+            } else if (id === 'wizard') {
+                dressBlueMat.color.setHex(0x581c87);
+                lanternLightGlow.material.color.setHex(0xe879f9);
+                lanternPointLight.color.setHex(0xe879f9);
+            } else if (id === 'sundae') {
+                dressBlueMat.color.setHex(0xf59e0b);
+                lanternLightGlow.material.color.setHex(0xfde047);
+                lanternPointLight.color.setHex(0xfde047);
+            } else {
+                dressBlueMat.color.setHex(0x1e3a8a);
+                lanternLightGlow.material.color.setHex(0x67e8f9);
+                lanternPointLight.color.setHex(0x67e8f9);
+            }
+
+            playSound('equip');
+            updateHUD();
+        }
+
+        // ---------------------------------------------------------------------
+        // SHOP TRANSACTIONS
+        // ---------------------------------------------------------------------
+        function toggleShop() {
+            const m = document.getElementById('shopModal');
+            m.classList.toggle('hidden');
+            playSound('pop');
+        }
+
+        function toggleBackpack() {
+            const m = document.getElementById('backpackModal');
+            m.classList.toggle('hidden');
+            playSound('pop');
+        }
+
+        function buyOrEquipSkin(id) {
+            if (id === 'default') {
+                applyCostume('default');
+                setTicker("Equipped default Torch Explorer skin!");
+                toggleShop();
+                return;
+            }
+
+            if (ownedSkins[id]) {
+                applyCostume(id);
+                setTicker(`Equipped ${id.toUpperCase()} skin!`);
+                toggleShop();
+                return;
+            }
+
+            // Purchasing conditions
+            if (id === 'sonic') {
+                if (candies >= 4 && gems >= 1) {
+                    candies -= 4;
+                    gems -= 1;
+                    ownedSkins.sonic = true;
+                    applyCostume('sonic');
+                    document.getElementById('btnSkin-sonic').innerText = "Equip";
+                    confetti({ particleCount: 150, spread: 80 });
+                    setTicker("UNLOCKED SONIC RUNNER! +80% Speed Boost active! ⚡🦔");
+                    toggleShop();
+                } else {
+                    playSound('step');
+                    setTicker("Need 4 Candies + 1 Mystic Gem to unlock Sonic! Shake trees & caves!");
+                }
+            } else if (id === 'skeleton') {
+                if (pumpkins >= 2) {
+                    pumpkins -= 2;
+                    ownedSkins.skeleton = true;
+                    applyCostume('skeleton');
+                    document.getElementById('btnSkin-skeleton').innerText = "Equip";
+                    confetti({ particleCount: 120, spread: 70 });
+                    setTicker("UNLOCKED SKELETON SPOOK! 💀");
+                    toggleShop();
+                } else {
+                    playSound('step');
+                    setTicker("Need 2 Magic Pumpkins! Shake the Ancient Pumpkin Tree!");
+                }
+            } else if (id === 'wizard') {
+                if (candies >= 3) {
+                    candies -= 3;
+                    ownedSkins.wizard = true;
+                    applyCostume('wizard');
+                    document.getElementById('btnSkin-wizard').innerText = "Equip";
+                    confetti({ particleCount: 120, spread: 70 });
+                    setTicker("UNLOCKED TWILIGHT WIZARD! 🧙‍♂️");
+                    toggleShop();
+                } else {
+                    playSound('step');
+                    setTicker("Need 3 Candies! Shake bushes and fairy cottage!");
+                }
+            } else if (id === 'sundae') {
+                if (hasSundaeHat) {
+                    applyCostume('sundae');
+                    setTicker("Equipped Alexander's sweet Sundae Hat! 🍨");
+                    toggleShop();
+                } else {
+                    setTicker("Find the hat in the Enchanted Well first! 🔍");
+                }
+            }
+            updateHUD();
+        }
+
+        // ---------------------------------------------------------------------
+        // INPUT CONTROLS: WASD / ARROWS + CLICK & DRAG
+        // ---------------------------------------------------------------------
+        const keys = { ArrowUp: false, ArrowDown: false, ArrowLeft: false, ArrowRight: false, KeyW: false, KeyS: false, KeyA: false, KeyD: false };
+
+        window.addEventListener('keydown', (e) => {
+            if (e.code in keys) { keys[e.code] = true; e.preventDefault(); }
+            if (e.code === 'Space') { triggerJump(); e.preventDefault(); }
+            if (e.code === 'KeyE') {
+                // Press [E] to talk if close to Alexander
+                const d = playerGroup.position.distanceTo(alexanderGroup.position);
+                if (d < 12) {
+                    clickGhostAlexander();
+                } else {
+                    setTicker("Walk closer to Ghost Alexander to talk! (Or click on him!)", "❌");
+                }
+            }
+        });
+        window.addEventListener('keyup', (e) => {
+            if (e.code in keys) { keys[e.code] = false; e.preventDefault(); }
+        });
+
+        function triggerJump() {
+            if (!isJumping) {
+                isJumping = true;
+                jumpVel = 9.2;
+                playSound('jump');
+            }
+        }
+
+        let isCamDragging = false;
+        let pointerDownTime = 0;
+        let pointerDownPos = { x: 0, y: 0 };
+        let mouseStart = { x: 0, y: 0 };
+
+        window.addEventListener('pointerdown', (e) => {
+            if (e.target.closest('#liveDialogueHUD') || e.target.closest('#backpackModal') || e.target.closest('#shopModal') || e.target.closest('#victoryModal') || e.target.closest('button')) {
+                return;
+            }
+            pointerDownTime = performance.now();
+            pointerDownPos = { x: e.clientX, y: e.clientY };
+            mouseStart = { x: e.clientX, y: e.clientY };
+            isCamDragging = true;
+        });
+
+        window.addEventListener('pointermove', (e) => {
+            if (!isCamDragging) return;
+            const dx = e.clientX - mouseStart.x;
+            const dy = e.clientY - mouseStart.y;
+            if (Math.hypot(dx, dy) > 2) {
+                camTheta -= dx * 0.007;
+                camPhi = Math.max(0.2, Math.min(1.15, camPhi + dy * 0.005));
+            }
+            mouseStart = { x: e.clientX, y: e.clientY };
+        });
+
+        window.addEventListener('pointerup', (e) => {
+            if (!isCamDragging) return;
+            isCamDragging = false;
+            const dur = performance.now() - pointerDownTime;
+            const dist = Math.hypot(e.clientX - pointerDownPos.x, e.clientY - pointerDownPos.y);
+
+            // True click detection (Not camera drag)
+            if (dur < 350 && dist < 12) {
+                mouseVec.x = (e.clientX / window.innerWidth) * 2 - 1;
+                mouseVec.y = -(e.clientY / window.innerHeight) * 2 + 1;
+                raycaster.setFromCamera(mouseVec, camera);
+
+                // 1. Check click on interactive props, items, or Alexander
+                const hits = raycaster.intersectObjects(clickableObjects, true);
+                if (hits.length > 0) {
+                    const hitObj = hits[0].object;
+
+                    // Clicked Folklore NPC (Vampire, Bat, Pumpkin)
+                    if (hitObj.userData.isFolkloreNPC) {
+                        showFolkloreModal(hitObj.userData.npcRef);
+                        return;
+                    }
+
+                    // Clicked Alexander the Ghost!
+                    if (hitObj.userData.isAlexander || (hitObj.parent && hitObj.parent.userData && hitObj.parent.userData.isAlexander)) {
+                        clickGhostAlexander();
+                        return;
+                    }
+
+                    // Clicked a dropped item to vacuum/pickup!
+                    if (hitObj.userData.isPickup) {
+                        pickupItem(hitObj.userData.dropRef);
+                        return;
+                    }
+
+                    // Clicked a Major Building (School, Church)
+                    const portalData = hitObj.userData.parentPortal;
+                    if (portalData) {
+                        const portal = portalData.userData;
+                        targetBuildingPos.copy(portalData.position);
+                        
+                        // Check Proximity to enter building
+                        if (playerGroup.position.distanceTo(portalData.position) > 12) {
+                            setTicker(`Walk closer to the ${portal.name} to enter!`);
+                            
+                            // Auto-walk player towards the door
+                            targetPos.set(portalData.position.x, 0, portalData.position.z + 6);
+                            isWalking = true;
+                            destDecal.position.set(targetPos.x, 0.06, targetPos.z);
+                            destDecal.visible = true;
+                        } else {
+                            enterBuilding(portal.name, portal.icon, 0xfef08a);
+                        }
+                        return;
+                    }
+
+                    // Clicked a harvestable prop (Bush, Tree, Cottage, Cavern, Well)
+                    const harvestProp = hitObj.userData.parentHarvestable;
+                    if (harvestProp && harvestProp.userData.isHarvestable) {
+                        handleHarvestClick(harvestProp);
+                        return;
+                    }
+                }
+
+                // 2. Click on ground to walk
+                const groundHits = raycaster.intersectObject(ground);
+                if (groundHits.length > 0) {
+                    const pt = groundHits[0].point;
+                    targetPos.set(pt.x, 0, pt.z);
+                    isWalking = true;
+                    destDecal.position.set(pt.x, 0.06, pt.z);
+                    destDecal.visible = true;
+                    playSound('step');
+                }
+            }
+        });
+
+        function handleHarvestClick(prop) {
+            const data = prop.userData;
+            data.shaking = true;
+            data.shakeTime = 0.45;
+            playSound('shake');
+
+            if (data.dropsLeft > 0) {
+                data.dropsLeft--;
+                spawnDroppedItem(data.dropType, prop.position);
+                setTicker(`You shook the ${data.name}! An item popped out! Click it to pick it up! ✨`);
+            } else {
+                setTicker(`The ${data.name} is empty for now! Check other spots!`);
+            }
+        }
+
+        window.addEventListener('wheel', (e) => {
+            camDist = Math.max(12, Math.min(45, camDist + e.deltaY * 0.03));
+        });
+
+        // ---------------------------------------------------------------------
+        // ANIMATION & PHYSICS GAME LOOP
+        // ---------------------------------------------------------------------
+        let lastTime = performance.now();
+        let stepCount = 0;
+
+        function animate(now) {
+            requestAnimationFrame(animate);
+
+            const dt = Math.min((now - lastTime) / 1000, 0.1);
+            lastTime = now;
+
+            // Speed calculation based on equipped skin (Sonic gives +80% boost)
+            const speedMultiplier = (equippedSkin === 'sonic') ? 1.8 : 1.0;
+            const currentSpeed = baseSpeed * speedMultiplier;
+
+            // Floating Crystals Rotation & Bob
+            floatingCrystals.forEach(fc => {
+                fc.mesh.rotation.y += fc.rotSpeed;
+                fc.mesh.position.y = fc.baseY + Math.sin(now * 0.002 + fc.mesh.position.x) * 0.5;
+            });
+
+            // Floating Halloween Mini Ghosts (Wandering with gentle wavy bob)
+            floatingMiniGhosts.forEach((mg, idx) => {
+                mg.angle += dt * mg.speed;
+                mg.group.position.x = mg.center.x + Math.cos(mg.angle) * mg.radius;
+                mg.group.position.z = mg.center.z + Math.sin(mg.angle) * mg.radius;
+                mg.group.position.y = mg.baseY + Math.sin(now * 0.003 + idx) * 0.45;
+                mg.group.rotation.y = mg.angle + Math.PI / 2;
+            });
+
+            // Lantern Light Glow Flicker
+            lanternLightGlow.scale.set(
+                1.0 + Math.sin(now * 0.02) * 0.12,
+                1.0 + Math.cos(now * 0.025) * 0.15,
+                1.0 + Math.sin(now * 0.02) * 0.12
+            );
+
+            // Shaking Animations for Harvestables
+            harvestables.forEach(h => {
+                if (h.userData.shaking) {
+                    h.userData.shakeTime -= dt;
+                    h.position.x += Math.sin(now * 0.05) * 0.12;
+                    if (h.userData.shakeTime <= 0) {
+                        h.userData.shaking = false;
+                    }
+                }
+            });
+
+            // Physics for Dropped Items
+            droppedItems.forEach(item => {
+                if (!item.landed) {
+                    item.group.position.x += item.velX * dt;
+                    item.group.position.z += item.velZ * dt;
+                    item.group.position.y += item.velY * dt;
+                    item.velY -= 14.0 * dt; // gravity
+
+                    if (item.group.position.y <= 0.4) {
+                        item.group.position.y = 0.4;
+                        item.landed = true;
+                    }
+                } else {
+                    item.group.rotation.y += 0.03;
+                    item.group.position.y = 0.4 + Math.sin(now * 0.005 + item.group.position.x) * 0.1;
+                }
+            });
+
+            // -------------------------------------------------------------
+            // PLAYER MOVEMENT & ANIMATION
+            // -------------------------------------------------------------
+            const kFwd = (keys.ArrowUp || keys.KeyW) ? 1 : 0;
+            const kBack = (keys.ArrowDown || keys.KeyS) ? 1 : 0;
+            const kLeft = (keys.ArrowLeft || keys.KeyA) ? 1 : 0;
+            const kRight = (keys.ArrowRight || keys.KeyD) ? 1 : 0;
+
+            const inputZ = kBack - kFwd;
+            const inputX = kRight - kLeft;
+            const hasKeyboardMove = (inputX !== 0 || inputZ !== 0);
+
+            if (hasKeyboardMove) {
+                isWalking = false;
+                destDecal.visible = false;
+
+                const forward = new THREE.Vector3(-Math.sin(camTheta), 0, -Math.cos(camTheta)).normalize();
+                const right = new THREE.Vector3(Math.cos(camTheta), 0, -Math.sin(camTheta)).normalize();
+
+                const moveDir = new THREE.Vector3()
+                    .addScaledVector(forward, -inputZ)
+                    .addScaledVector(right, inputX)
+                    .normalize();
+
+                playerGroup.position.addScaledVector(moveDir, currentSpeed * dt);
+                const targetRot = Math.atan2(moveDir.x, moveDir.z);
+                playerGroup.rotation.y = THREE.MathUtils.lerp(playerGroup.rotation.y, targetRot, 0.25);
+
+                walkCycle += dt * (equippedSkin === 'sonic' ? 22 : 14);
+                pLegL.rotation.x = Math.sin(walkCycle) * 0.75;
+                pLegR.rotation.x = -Math.sin(walkCycle) * 0.75;
+
+                stepCount++;
+                if (stepCount % (equippedSkin === 'sonic' ? 10 : 16) === 0) {
+                    playSound(equippedSkin === 'sonic' ? 'sonicStep' : 'step');
+                }
+            } else if (isWalking) {
+                const toTarget = new THREE.Vector3().subVectors(targetPos, playerGroup.position);
+                toTarget.y = 0;
+                const dist = toTarget.length();
+
+                if (dist > 0.3) {
+                    toTarget.normalize();
+                    playerGroup.position.addScaledVector(toTarget, currentSpeed * dt);
+                    const targetRot = Math.atan2(toTarget.x, toTarget.z);
+                    playerGroup.rotation.y = THREE.MathUtils.lerp(playerGroup.rotation.y, targetRot, 0.2);
+
+                    walkCycle += dt * (equippedSkin === 'sonic' ? 22 : 14);
+                    pLegL.rotation.x = Math.sin(walkCycle) * 0.75;
+                    pLegR.rotation.x = -Math.sin(walkCycle) * 0.75;
+
+                    stepCount++;
+                    if (stepCount % (equippedSkin === 'sonic' ? 10 : 16) === 0) {
+                        playSound(equippedSkin === 'sonic' ? 'sonicStep' : 'step');
+                    }
+                } else {
+                    isWalking = false;
+                    destDecal.visible = false;
+                    pLegL.rotation.x = 0;
+                    pLegR.rotation.x = 0;
+                }
+            } else {
+                pLegL.rotation.x = 0;
+                pLegR.rotation.x = 0;
+            }
+
+            // Jump Physics
+            if (isJumping) {
+                playerGroup.position.y += jumpVel * dt;
+                jumpVel -= gravity * dt;
+                if (playerGroup.position.y <= 0) {
+                    playerGroup.position.y = 0;
+                    isJumping = false;
+                    jumpVel = 0;
+                }
+            }
+
+            // Head Bobbing
+            pHead.position.y = (hasKeyboardMove || isWalking) ? (2.45 + Math.abs(Math.sin(walkCycle * 2)) * 0.08) : 2.45;
+
+            // -------------------------------------------------------------
+            // LIVING GHOST ALEXANDER AI: PATROL & SCARE CYCLE
+            // -------------------------------------------------------------
+            if (!questCompleted) {
+                if (ghostAI.state === 'talking') {
+                    // Alexander halts completely and faces the player during conversation
+                    const toPlayer = new THREE.Vector3().subVectors(playerGroup.position, alexanderGroup.position);
+                    toPlayer.y = 0;
+                    if (toPlayer.length() > 0.1) {
+                        alexanderGroup.rotation.y = THREE.MathUtils.lerp(alexanderGroup.rotation.y, Math.atan2(toPlayer.x, toPlayer.z), 0.1);
+                    }
+                    alexanderGroup.scale.setScalar(1.0);
+                } else {
+                    const targetKid = npcKids[ghostAI.currentTargetKid];
+                    const kidPos = targetKid.group.position;
+
+                    if (ghostAI.state === 'patrol') {
+                        // Fly towards current target kid
+                        const toKid = new THREE.Vector3().subVectors(kidPos, alexanderGroup.position);
+                        toKid.y = 0;
+                        const dToKid = toKid.length();
+
+                        if (dToKid > 3.0) {
+                            toKid.normalize();
+                            alexanderGroup.position.addScaledVector(toKid, 4.2 * dt);
+                            alexanderGroup.rotation.y = THREE.MathUtils.lerp(alexanderGroup.rotation.y, Math.atan2(toKid.x, toKid.z), 0.1);
+                        } else {
+                            // Reached kid! Begin swelling to giant scare mode!
+                            ghostAI.state = 'swelling';
+                            ghostAI.timer = 0;
+                            playSound('boo');
+                        }
+                    } else if (ghostAI.state === 'swelling') {
+                        ghostAI.timer += dt;
+                        // Swell from 1.0x to 2.5x
+                        ghostAI.scale = THREE.MathUtils.lerp(ghostAI.scale, 2.5, 0.15);
+                        alexanderGroup.scale.setScalar(ghostAI.scale);
+                        ghostMat.emissive.setHex(0xdc2626); // Angry glowing red eyes/emissive!
+                        darkMat.color.setHex(0xff0000);
+
+                        if (ghostAI.timer > 0.45) {
+                            ghostAI.state = 'scaring';
+                            ghostAI.timer = 0;
+                            ghostAI.booTimer = 1.3;
+                            playSound('screech');
+
+                            // Trigger kid panic! Kid screams and flees!
+                            targetKid.scaredTimer = 2.4;
+                            targetKid.targetPos.set(
+                                kidPos.x + (Math.random() - 0.5) * 16,
+                                0,
+                                kidPos.z + (Math.random() - 0.5) * 16
+                            );
+
+                            // Trigger comic BOO floating billboard
+                            const booEl = document.getElementById('booFloatingTag');
+                            booEl.classList.remove('hidden');
+                        }
+                    } else if (ghostAI.state === 'scaring') {
+                        ghostAI.timer += dt;
+                        // Jitter scare shaking effect
+                        alexanderGroup.position.x += Math.sin(now * 0.08) * 0.06;
+
+                        if (ghostAI.timer > 1.2) {
+                            ghostAI.state = 'shrinking';
+                            ghostAI.timer = 0;
+                            const booEl = document.getElementById('booFloatingTag');
+                            booEl.classList.add('hidden');
+                        }
+                    } else if (ghostAI.state === 'shrinking') {
+                        // Shrink back to normal cute marshmallow size
+                        ghostAI.scale = THREE.MathUtils.lerp(ghostAI.scale, 1.0, 0.12);
+                        alexanderGroup.scale.setScalar(ghostAI.scale);
+
+                        if (Math.abs(ghostAI.scale - 1.0) < 0.05) {
+                            ghostAI.scale = 1.0;
+                            alexanderGroup.scale.setScalar(1.0);
+                            ghostMat.emissive.setHex(0x9333ea);
+                            darkMat.color.setHex(0x18181b);
+
+                            // Select next kid to chase!
+                            ghostAI.currentTargetKid = (ghostAI.currentTargetKid + 1) % npcKids.length;
+                            ghostAI.state = 'patrol';
+                        }
+                    }
+                }
+            } else {
+                // Quest solved: Alexander floats happily in place
+                alexanderGroup.scale.setScalar(1.0);
+                alexanderGroup.position.lerp(new THREE.Vector3(0, 3.2, -18), 0.05);
+            }
+
+            // Alexander Hover Bob
+            alexanderGroup.position.y = 3.2 + Math.sin(now * 0.003) * 0.35;
+
+            // Update NPC Kids behavior & leg animation
+            npcKids.forEach(kid => {
+                if (kid.scaredTimer > 0) {
+                    kid.scaredTimer -= dt;
+                    // Run frantically with flailing legs
+                    const toTgt = new THREE.Vector3().subVectors(kid.targetPos, kid.group.position);
+                    toTgt.y = 0;
+                    if (toTgt.length() > 0.4) {
+                        toTgt.normalize();
+                        kid.group.position.addScaledVector(toTgt, kid.speed * 1.8 * dt);
+                        kid.group.rotation.y = Math.atan2(toTgt.x, toTgt.z);
+                    }
+                    kid.walkCycle += dt * 24;
+                    kid.legL.rotation.x = Math.sin(kid.walkCycle) * 0.9;
+                    kid.legR.rotation.x = -Math.sin(kid.walkCycle) * 0.9;
+                } else {
+                    // Calmly return towards base position
+                    const toBase = new THREE.Vector3().subVectors(kid.basePos, kid.group.position);
+                    toBase.y = 0;
+                    if (toBase.length() > 0.5) {
+                        toBase.normalize();
+                        kid.group.position.addScaledVector(toBase, kid.speed * 0.6 * dt);
+                        kid.group.rotation.y = Math.atan2(toBase.x, toBase.z);
+                        kid.walkCycle += dt * 8;
+                        kid.legL.rotation.x = Math.sin(kid.walkCycle) * 0.4;
+                        kid.legR.rotation.x = -Math.sin(kid.walkCycle) * 0.4;
+                    } else {
+                        kid.legL.rotation.x = 0;
+                        kid.legR.rotation.x = 0;
+                    }
+                }
+            });
+
+            // Project Alexander "Click Me" indicator above his head
+            const indEl = document.getElementById('ghostIndicator');
+            const booEl = document.getElementById('booFloatingTag');
+            const gWorld = new THREE.Vector3();
+            alexanderGroup.getWorldPosition(gWorld);
+            gWorld.y += 2.8 * ghostAI.scale;
+            const proj = gWorld.project(camera);
+
+            if (proj.z < 1) {
+                const sx = (proj.x * 0.5 + 0.5) * window.innerWidth;
+                const sy = (-(proj.y * 0.5) + 0.5) * window.innerHeight;
+                indEl.style.left = `${sx}px`;
+                indEl.style.top = `${sy}px`;
+                indEl.classList.remove('hidden');
+
+                if (!booEl.classList.contains('hidden')) {
+                    booEl.style.left = `${sx}px`;
+                    booEl.style.top = `${sy - 30}px`;
+                }
+            } else {
+                indEl.classList.add('hidden');
+                booEl.classList.add('hidden');
+            }
+
+            // Camera Tracking
+            const cx = playerGroup.position.x + camDist * Math.sin(camTheta) * Math.cos(camPhi);
+            const cy = playerGroup.position.y + camDist * Math.sin(camPhi) + 3.0;
+            const cz = playerGroup.position.z + camDist * Math.cos(camTheta) * Math.cos(camPhi);
+
+            camera.position.set(cx, cy, cz);
+            camera.lookAt(playerGroup.position.x, playerGroup.position.y + 1.8, playerGroup.position.z);
+
+            if (destDecal.visible) destDecal.rotation.z += 0.04;
+
+            renderer.render(scene, camera);
+        }
+
+        // Window Resize
+        window.addEventListener('resize', () => {
+            camera.aspect = window.innerWidth / window.innerHeight;
+            camera.updateProjectionMatrix();
+            renderer.setSize(window.innerWidth, window.innerHeight);
+        });
+
+        // Initialize on load
+        window.addEventListener('load', () => {
+            updateHUD();
+            requestAnimationFrame(animate);
+        });
+    </script>
+</body>
+</html>
