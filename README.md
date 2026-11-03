@@ -1,1 +1,4 @@
-# neu
+# Alexanderghost_hackathon_googlefest
+The project using Gemini, HTML, Three.js, CSS, and n8n, I still delivered an inspiring presentation and won the Most Innovative Prize at Hacktoberfest 2026: Sunderland AI Hack Day!
+
+My main purpose was to address children's fear of Halloween by turning everything into a game that gives kids the opportunity to interact with ghosts and vampires and understand the stories behind them. Additionally, when children click on characters inside the game, they learn about the history of Halloween and ghosts. This gives them not only fun, but also valuable real-life knowledge. I also integrated n8n to create an automated workflow: once children finish the game, the system sends an email to their parents to help them manage and control excessive screen time. It was a fascinating opportunity to showcase my ability to build websites and use AI to solve real-world problems.
